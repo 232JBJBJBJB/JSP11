@@ -20,10 +20,11 @@ struct QuizView: View {
     // 단어 추가용 상태
     @State private var newQuizTerm = ""
     @State private var newQuizMeaning = ""
+    @State private var isSavingWord = false // 🌟 [추가] 단어 저장 중인지 확인하는 로컬 상태
     
     var body: some View {
         VStack {
-            // 🌟 [핵심 변경점] if-else 지옥에서 벗어나 깔끔한 switch 문으로 변경!
+            // 깔끔한 switch 문으로 상태 관리
             switch quizViewModel.state {
                 
             case .idle:
@@ -40,14 +41,14 @@ struct QuizView: View {
                     .controlSize(.large)
                 
             case .success(let quiz):
-                // [상황 3] 퀴즈 도착 (메인 게임 화면) - quiz 데이터가 안전하게 풀려서 들어옴!
+                // [상황 3] 퀴즈 도착 (메인 게임 화면)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         
-                        // 1. 듣기 버튼 블록 (조립)
+                        // 1. 듣기 버튼 블록
                         QuizAudioButton(text: quiz.passage)
                         
-                        // 2. 지문 박스 블록 (조립)
+                        // 2. 지문 박스 블록
                         QuizPassageView(text: quiz.passage)
                         
                         // 3. 질문 텍스트
@@ -55,7 +56,7 @@ struct QuizView: View {
                             .font(.headline)
                             .padding(.top, 10)
                         
-                        // 4. 보기 버튼들 (반복문으로 조립)
+                        // 4. 보기 버튼들
                         ForEach(quiz.options.indices, id: \.self) { index in
                             QuizOptionButton(
                                 index: index,
@@ -112,7 +113,7 @@ struct QuizView: View {
         }
     }
     
-    // 뷰: 단어 추가 시트 (이것도 body가 너무 길어질까봐 변수로 뺌)
+    // 뷰: 단어 추가 시트
     var addWordSheet: some View {
         NavigationStack {
             Form {
@@ -131,17 +132,30 @@ struct QuizView: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(Constants.Labels.save) {
+                    Button(action: {
                         Task {
+                            isSavingWord = true // 🌟 버튼 누르면 로딩 시작!
                             let success = await wordViewModel.addWord(term: newQuizTerm, meaning: newQuizMeaning)
+                            isSavingWord = false // 🌟 통신 끝나면 로딩 끝!
+                            
                             if success {
                                 showAddSheet = false
                                 newQuizTerm = ""
                                 newQuizMeaning = ""
                             }
                         }
+                    }) {
+                        // 🌟 통신 중이면 뱅글뱅글 애니메이션, 아니면 "저장" 글자 표시
+                        if isSavingWord {
+                            ProgressView()
+                        } else {
+                            Text(Constants.Labels.save)
+                        }
                     }
-                    .disabled(newQuizTerm.trimmingCharacters(in: .whitespaces).isEmpty || newQuizMeaning.trimmingCharacters(in: .whitespaces).isEmpty)
+                    // 🌟 빈칸이거나 통신 중일 때는 버튼 꾹 막아두기
+                    .disabled(newQuizTerm.trimmingCharacters(in: .whitespaces).isEmpty ||
+                              newQuizMeaning.trimmingCharacters(in: .whitespaces).isEmpty ||
+                              isSavingWord)
                 }
             }
         }
@@ -151,13 +165,12 @@ struct QuizView: View {
 
 // MARK: - [2] 레고 블록들 (하위 컴포넌트)
 
-// 🧱 블록 1: 보기 버튼 (가장 복잡했던 녀석)
+// 🧱 블록 1: 보기 버튼
 struct QuizOptionButton: View {
     let index: Int
     let optionText: String
     let answerIndex: Int
     
-    // 부모(QuizView)의 상태를 바꿀 수 있게 연결고리(Binding)를 받음
     @Binding var selectedOption: Int?
     @Binding var showResult: Bool
     
@@ -190,7 +203,7 @@ struct QuizOptionButton: View {
         .disabled(showResult)
     }
     
-    // 테두리 색상 계산 로직 (뷰 안에 섞여있던 걸 깔끔하게 변수로 뺌)
+    // 테두리 색상 계산 로직
     var borderColor: Color {
         if selectedOption == index {
             return .blue
@@ -249,7 +262,7 @@ struct QuizPassageView: View {
 struct QuizEmptyView: View {
     let errorMessage: String?
     let isWordEmpty: Bool
-    let onStart: () -> Void // 버튼 눌렀을 때 실행할 함수를 전달받음
+    let onStart: () -> Void
     
     var body: some View {
         VStack(spacing: 20) {

@@ -13,22 +13,23 @@ enum QuizState {
 
 @MainActor
 class QuizViewModel: ObservableObject {
-    // 🌟 변수 3개를 'state' 하나로 통합! (처음엔 대기 상태로 시작)
+    // 🌟 변수들을 'state' 하나로 통합! (처음엔 대기 상태로 시작)
     @Published var state: QuizState = .idle
     
     private let model: GenerativeModel
     
     init() {
-        let apiKey = Bundle.main.geminiApiKey
+        let apiKey = Bundle.main.geminiApiKey // 기존에 만들어둔 extension 활용
         // [Constants 적용] 모델 이름
         self.model = GenerativeModel(name: Constants.Config.modelName, apiKey: apiKey)
     }
     
+    // 🌟 파라미터로 통합된 모델인 [Word]를 받음! (AWS에서 가져온 데이터)
     func makeQuiz(from savedWords: [Word]) async {
-        // 🌟 로딩 시작! (기존의 isLoading = true, errorMessage = nil 역할을 한 번에 함)
+        // 로딩 시작!
         state = .loading
         
-        // 1. 🎲 50:50 동전 던지기! (단어장이 비어있으면 강제로 '새 단어 모드' 실행)
+        // 1. 🎲 50:50 동전 던지기! (단어장이 비어있으면 강제로 '새 단어 모드')
         let isReviewMode = savedWords.isEmpty ? false : Bool.random()
         
         // 2. 모드에 따른 AI 지시사항(프롬프트) 작성
@@ -36,7 +37,8 @@ class QuizViewModel: ObservableObject {
         
         if isReviewMode {
             // 🟢 [복습 모드] 내 단어장에서 랜덤으로 하나 뽑기
-            let seedWord = savedWords.randomElement()!.term
+            // 🚨 [변경점] 기존의 `!` 강제 추출 대신 안전하게 `?` 사용 후 기본값 처리 (앱 튕김 방지)
+            let seedWord = savedWords.randomElement()?.term ?? "蘋果"
             modeInstruction = """
             [현재 모드: 복습 모드]
             사용자가 이미 학습 중인 단어: [ \(seedWord) ]
@@ -69,15 +71,15 @@ class QuizViewModel: ObservableObject {
         
         [필수 조건 - 아주 중요]:
         1. 글의 형식: 반드시 '\(selectedStyle)' 스타일로 작성할 것.
-          - 설정 화면이라면: '개인정보 보호', '배터리', '알림' 같은 딱딱하고 간결한 어조.
-          - 안내문이라면: '주의사항', '금지', '이용 방법' 같은 공적인 어조.
+            - 설정 화면이라면: '개인정보 보호', '배터리', '알림' 같은 딱딱하고 간결한 어조.
+            - 안내문이라면: '주의사항', '금지', '이용 방법' 같은 공적인 어조.
         2. 언어 스타일: '중국 본토(Mainland)' 표준어 어휘 + '번체자(Traditional)' 표기.
         3. 지문 길이: 2줄 정도로 아주 짧고 간결하게 작성할 것.
         
         4. ★ 빈칸(정답) 설정 ★:
-          - 복습 모드든 새 단어 모드든, 빈칸 [____]에 들어갈 정답이 반드시 위에서 선정된 단어일 필요는 없음.
-          - 핵심 단어는 글의 문맥(Context)을 만드는 데 사용하고, 정답은 그 문맥에서 문법적으로나 의미적으로 중요한 다른 단어(동사, 형용사, 접속사 등)여도 됨.
-          - 사용자가 글을 끝까지 읽고 흐름을 파악해야 풀 수 있게 출제해.
+            - 복습 모드든 새 단어 모드든, 빈칸 [____]에 들어갈 정답이 반드시 위에서 선정된 단어일 필요는 없음.
+            - 핵심 단어는 글의 문맥(Context)을 만드는 데 사용하고, 정답은 그 문맥에서 문법적으로나 의미적으로 중요한 다른 단어(동사, 형용사, 접속사 등)여도 됨.
+            - 사용자가 글을 끝까지 읽고 흐름을 파악해야 풀 수 있게 출제해.
         
         5. 질문: "다음 글의 빈칸에 들어갈 말로 가장 적절한 것은?" (한국어)
         6. 보기: 정답 1개, 오답 4개 (모두 번체자).
@@ -96,12 +98,11 @@ class QuizViewModel: ObservableObject {
         do {
             let response = try await model.generateContent(prompt)
             guard let text = response.text else {
-                // 🚨 에러: 대답이 없을 때
                 state = .failure(Constants.Errors.noResponse)
                 return
             }
             
-            // 🧹 마크다운 찌꺼기만 깔끔하게 지우는 코드! (문자열 결합으로 버그 원천 차단)
+            // 🧹 마크다운 찌꺼기 깔끔하게 지우기
             let cleanText = text.replacingOccurrences(of: "`" + "`" + "`json", with: "")
                                 .replacingOccurrences(of: "`" + "`" + "`", with: "")
                                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -111,7 +112,6 @@ class QuizViewModel: ObservableObject {
                 // 🌟 성공: 데이터 파싱까지 완료되면 success 상태로 변경!
                 state = .success(decodedQuiz)
             } else {
-                // 🚨 에러: 데이터 파싱 실패 시
                 state = .failure(Constants.Errors.dataParseFailed)
             }
         } catch {

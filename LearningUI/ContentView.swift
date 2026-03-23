@@ -1,13 +1,11 @@
 import SwiftUI
 
-
 // MARK: - [1] 상세 화면 (WordDetailView)
 struct WordDetailView: View {
-    @EnvironmentObject var viewModel: WordViewModel // 수정 완료 후 저장을 위해 뷰모델 호출
-    @State private var word: Word // 🌟 struct로 바뀌었으니 @State로 변수 선언!
+    @EnvironmentObject var viewModel: WordViewModel
+    @State private var word: Word
     @State private var isEditing = false
     
-    // 처음에 눌러서 들어온 단어를 @State에 쏙 넣어줌
     init(word: Word) {
         _word = State(initialValue: word)
     }
@@ -15,12 +13,12 @@ struct WordDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                // 🧱 1. 헤더 블록 (단어 + 스피커) - 이제 $word 처럼 Binding으로 넘겨줌
+                // 1. 헤더 블록 (단어 + 스피커)
                 WordDetailHeaderView(word: $word, isEditing: isEditing)
                 
                 Divider()
                 
-                // 🧱 2. 상세 내용 블록 (뜻, 발음, 예문)
+                // 2. 상세 내용 블록 (뜻, 발음, 예문)
                 WordDetailContentView(word: $word, isEditing: isEditing)
             }
             .padding()
@@ -41,10 +39,8 @@ struct WordDetailView: View {
                    word.meaning.trimmingCharacters(in: .whitespaces).isEmpty {
                     return
                 }
-                // 🌟 [수정 완료 시] 구름(Firebase)에 업데이트 해달라고 점장님한테 요청!
-                Task {
-                    await viewModel.updateWord(word: word)
-                }
+                // 🌟 [수정 완료 시] 뷰모델이 스스로 Task를 처리하므로 바로 호출!
+                viewModel.updateWord(word: word)
             }
             isEditing.toggle()
         }) {
@@ -66,8 +62,8 @@ struct WordDetailView: View {
 
 // MARK: - [2] 메인 화면 (ContentView)
 struct ContentView: View {
-    // 🌟 [핵심!] 알바생이 태어날 때 '구글 파견 점장님'을 짝지어줌!
-    @StateObject var viewModel = WordViewModel(repository: FirebaseWordRepository())
+    // 🌟 [최강 핵심!] 파이어베이스 점장님 해고 완료! 이제 빈 괄호로 깔끔하게 시작!
+    @StateObject var viewModel = WordViewModel()
     @StateObject var quizViewModel = QuizViewModel()
     
     @State private var newTerm: String = ""
@@ -78,17 +74,13 @@ struct ContentView: View {
             List {
                 ForEach(viewModel.filteredWords) { word in
                     WordListRowView(word: word, onToggleStar: {
-                        // 🌟 별표 누를 때도 클라우드(Firebase)에 저장해야 하니까 Task로 감쌈
-                        Task {
-                            await viewModel.toggleMemorized(word: word)
-                        }
+                        // 🌟 뷰모델이 Task를 품고 있어서, View에서는 깔끔하게 함수만 호출!
+                        viewModel.toggleMemorized(word: word)
                     })
                 }
                 .onDelete { indexSet in
-                    // 🌟 단어 지울 때도 클라우드(Firebase) 통신하니까 Task로 감쌈
-                    Task {
-                        await viewModel.deleteWord(at: indexSet)
-                    }
+                    // 🌟 여기도 귀찮은 Task/await 삭제!
+                    viewModel.deleteWord(at: indexSet)
                 }
             }
             .scrollContentBackground(.hidden)
@@ -101,12 +93,12 @@ struct ContentView: View {
             .searchable(text: $viewModel.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: Constants.Labels.searchPrompt)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                        NavigationLink(destination: MainCameraView()) {
-                            Image(systemName: Constants.Icons.camera)
-                                .font(.title3)
-                                .foregroundStyle(.blue)
-                        }
+                    NavigationLink(destination: MainCameraView()) {
+                        Image(systemName: Constants.Icons.camera)
+                            .font(.title3)
+                            .foregroundStyle(.blue)
                     }
+                }
                 
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink(destination: QuizView(quizViewModel: quizViewModel).environmentObject(viewModel)) {
@@ -117,14 +109,12 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            // 🌟 화면 켜질 때 클라우드(Firebase)에서 단어 가져오기
-            Task {
-                await viewModel.loadWords()
-            }
+            // 🌟 앱 켜질 때도 깔끔하게 한 줄로 AWS에서 단어 땡겨오기!
+            viewModel.loadWords()
         }
     }
     
-    // 🌟 단어 추가도 클라우드(Firebase) 통신이라 Task로 감쌈
+    // 🌟 이 녀석만 async 유지! (성공 여부 Bool 값을 받아와서 텍스트를 지워야 하니까)
     private func addNewWord() {
         Task {
             let success = await viewModel.addWord(term: newTerm, meaning: newMeaning)
@@ -137,10 +127,11 @@ struct ContentView: View {
 }
 
 // MARK: - [3] 레고 블록들 (하위 컴포넌트)
+// 👇 이 아래 블록들(WordDetailHeaderView, WordDetailContentView, WordListRowView, AddWordBottomBarView)은
+// 완벽하게 뷰(UI) 역할만 하고 있어서 수정할 곳이 0군데야! 네가 준 코드 그대로 쓰면 돼.
 
-// 🧱 블록 1: 상세 화면의 상단 헤더
 struct WordDetailHeaderView: View {
-    @Binding var word: Word // 🌟 @Bindable 대신 @Binding으로 변경
+    @Binding var word: Word
     let isEditing: Bool
     
     var body: some View {
@@ -162,9 +153,8 @@ struct WordDetailHeaderView: View {
     }
 }
 
-// 🧱 블록 2: 상세 화면의 뜻/발음/예문 부분
 struct WordDetailContentView: View {
-    @Binding var word: Word // 🌟 @Bindable 대신 @Binding으로 변경
+    @Binding var word: Word
     let isEditing: Bool
     
     var body: some View {
@@ -186,7 +176,6 @@ struct WordDetailContentView: View {
     }
 }
 
-// 🧱 블록 3: 메인 화면의 단어 리스트 '한 줄' (이건 변경 없음)
 struct WordListRowView: View {
     let word: Word
     let onToggleStar: () -> Void
@@ -213,7 +202,6 @@ struct WordListRowView: View {
     }
 }
 
-// 🧱 블록 4: 메인 화면의 하단 '단어 추가 바' (이건 변경 없음)
 struct AddWordBottomBarView: View {
     @Binding var newTerm: String
     @Binding var newMeaning: String

@@ -22,6 +22,7 @@
 		4778A4D62F63FB6B0097CCB1 /* CameraPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4778A4CC2F63F54E0097CCB1 /* CameraPreview.swift */; };
 		4778A4D72F63FC160097CCB1 /* MainCameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4778A4CE2F63F5780097CCB1 /* MainCameraView.swift */; };
 		4778A4EB2F68E1D60097CCB1 /* ARViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4778A4EA2F68DE4D0097CCB1 /* ARViewModel.swift */; };
+		47C3C1E92F74010C00503C09 /* ARNetworkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47C3C1E82F74010200503C09 /* ARNetworkManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -50,6 +51,7 @@
 		4778A4CD2F63F55F0097CCB1 /* CameraManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraManager.swift; sourceTree = "<group>"; };
 		4778A4CE2F63F5780097CCB1 /* MainCameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainCameraView.swift; sourceTree = "<group>"; };
 		4778A4EA2F68DE4D0097CCB1 /* ARViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARViewModel.swift; sourceTree = "<group>"; };
+		47C3C1E82F74010200503C09 /* ARNetworkManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARNetworkManager.swift; sourceTree = "<group>"; };
 		47F0D59D2F716B9C0079A640 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -154,6 +156,7 @@
 		4778A4E92F68DE450097CCB1 /* AR */ = {
 			isa = PBXGroup;
 			children = (
+				47C3C1E82F74010200503C09 /* ARNetworkManager.swift */,
 				4778A4EA2F68DE4D0097CCB1 /* ARViewModel.swift */,
 			);
 			path = AR;
@@ -299,6 +302,7 @@
 				4764D68B2F461B060046B5A5 /* WordViewModel.swift in Sources */,
 				4778A4BB2F62A4F70097CCB1 /* Bundle+Extension.swift in Sources */,
 				4778A4EB2F68E1D60097CCB1 /* ARViewModel.swift in Sources */,
+				47C3C1E92F74010C00503C09 /* ARNetworkManager.swift in Sources */,
 				4778A4BC2F62A4F70097CCB1 /* Constants.swift in Sources */,
 				4778A4D72F63FC160097CCB1 /* MainCameraView.swift in Sources */,
 			);

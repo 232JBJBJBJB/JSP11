@@ -23,6 +23,12 @@
 		4778A4D72F63FC160097CCB1 /* MainCameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4778A4CE2F63F5780097CCB1 /* MainCameraView.swift */; };
 		4778A4EB2F68E1D60097CCB1 /* ARViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4778A4EA2F68DE4D0097CCB1 /* ARViewModel.swift */; };
 		47C3C1E92F74010C00503C09 /* ARNetworkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47C3C1E82F74010200503C09 /* ARNetworkManager.swift */; };
+		47C3C20F2F74DACB00503C09 /* ARRender.vcxproj.filters in Resources */ = {isa = PBXBuildFile; fileRef = 47C3C20C2F74DACB00503C09 /* ARRender.vcxproj.filters */; };
+		47C3C2102F74DACB00503C09 /* ARRender.sln in Resources */ = {isa = PBXBuildFile; fileRef = 47C3C20A2F74DACB00503C09 /* ARRender.sln */; };
+		47C3C2112F74DACB00503C09 /* ARRender.vcxproj.user in Resources */ = {isa = PBXBuildFile; fileRef = 47C3C20D2F74DACB00503C09 /* ARRender.vcxproj.user */; };
+		47C3C2122F74DACB00503C09 /* ARRender.vcxproj in Resources */ = {isa = PBXBuildFile; fileRef = 47C3C20B2F74DACB00503C09 /* ARRender.vcxproj */; };
+		47C3C2132F74DACB00503C09 /* ARBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = 47C3C2072F74DACB00503C09 /* ARBridge.mm */; };
+		47C3C2142F74DACB00503C09 /* ARBubbleRenderer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 47C3C2092F74DACB00503C09 /* ARBubbleRenderer.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -52,6 +58,14 @@
 		4778A4CE2F63F5780097CCB1 /* MainCameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainCameraView.swift; sourceTree = "<group>"; };
 		4778A4EA2F68DE4D0097CCB1 /* ARViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARViewModel.swift; sourceTree = "<group>"; };
 		47C3C1E82F74010200503C09 /* ARNetworkManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARNetworkManager.swift; sourceTree = "<group>"; };
+		47C3C2062F74DACB00503C09 /* ARBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARBridge.h; sourceTree = "<group>"; };
+		47C3C2072F74DACB00503C09 /* ARBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ARBridge.mm; sourceTree = "<group>"; };
+		47C3C2082F74DACB00503C09 /* ARBubbleRenderer.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ARBubbleRenderer.hpp; sourceTree = "<group>"; };
+		47C3C2092F74DACB00503C09 /* ARBubbleRenderer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ARBubbleRenderer.cpp; sourceTree = "<group>"; };
+		47C3C20A2F74DACB00503C09 /* ARRender.sln */ = {isa = PBXFileReference; lastKnownFileType = text; path = ARRender.sln; sourceTree = "<group>"; };
+		47C3C20B2F74DACB00503C09 /* ARRender.vcxproj */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = ARRender.vcxproj; sourceTree = "<group>"; };
+		47C3C20C2F74DACB00503C09 /* ARRender.vcxproj.filters */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = ARRender.vcxproj.filters; sourceTree = "<group>"; };
+		47C3C20D2F74DACB00503C09 /* ARRender.vcxproj.user */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = ARRender.vcxproj.user; sourceTree = "<group>"; };
 		47F0D59D2F716B9C0079A640 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -92,6 +106,7 @@
 			isa = PBXGroup;
 			children = (
 				47F0D59D2F716B9C0079A640 /* .gitignore */,
+				47C3C20E2F74DACB00503C09 /* ARRender */,
 				4778A4E92F68DE450097CCB1 /* AR */,
 				4778A4D22F63F6060097CCB1 /* etcs */,
 				4778A4D12F63F5AC0097CCB1 /* Word */,
@@ -167,6 +182,21 @@
 			children = (
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		47C3C20E2F74DACB00503C09 /* ARRender */ = {
+			isa = PBXGroup;
+			children = (
+				47C3C2062F74DACB00503C09 /* ARBridge.h */,
+				47C3C2072F74DACB00503C09 /* ARBridge.mm */,
+				47C3C2082F74DACB00503C09 /* ARBubbleRenderer.hpp */,
+				47C3C2092F74DACB00503C09 /* ARBubbleRenderer.cpp */,
+				47C3C20A2F74DACB00503C09 /* ARRender.sln */,
+				47C3C20B2F74DACB00503C09 /* ARRender.vcxproj */,
+				47C3C20C2F74DACB00503C09 /* ARRender.vcxproj.filters */,
+				47C3C20D2F74DACB00503C09 /* ARRender.vcxproj.user */,
+			);
+			path = ARRender;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -276,6 +306,10 @@
 			files = (
 				4778A4C22F62A4F70097CCB1 /* Assets.xcassets in Resources */,
 				4778A4C32F62A4F70097CCB1 /* GoogleService-Info.plist in Resources */,
+				47C3C20F2F74DACB00503C09 /* ARRender.vcxproj.filters in Resources */,
+				47C3C2102F74DACB00503C09 /* ARRender.sln in Resources */,
+				47C3C2112F74DACB00503C09 /* ARRender.vcxproj.user in Resources */,
+				47C3C2122F74DACB00503C09 /* ARRender.vcxproj in Resources */,
 				4778A4C42F62A4F70097CCB1 /* Secrets.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -296,6 +330,8 @@
 			files = (
 				4778A4D52F63FB680097CCB1 /* CameraManager.swift in Sources */,
 				4764D6882F461B060046B5A5 /* QuizView.swift in Sources */,
+				47C3C2132F74DACB00503C09 /* ARBridge.mm in Sources */,
+				47C3C2142F74DACB00503C09 /* ARBubbleRenderer.cpp in Sources */,
 				4778A4D62F63FB6B0097CCB1 /* CameraPreview.swift in Sources */,
 				4764D6892F461B060046B5A5 /* QuizViewModel.swift in Sources */,
 				4764D68A2F461B060046B5A5 /* Word.swift in Sources */,

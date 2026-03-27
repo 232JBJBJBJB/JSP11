@@ -21,8 +21,8 @@ private:
     void DrawTextLabel(const std::string& text, float x, float y, float fontSize);
 
 public:
-    ARBubbleRenderer() = default;
-    ~ARBubbleRenderer() = default;
+    ARBubbleRenderer();
+    ~ARBubbleRenderer();
 
     void UpdateWords(const std::vector<ARWordData>& words);
     void Render(float screenWidth, float screenHeight);

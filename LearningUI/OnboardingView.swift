@@ -127,7 +127,7 @@ struct OnboardingView: View {
         targetVoiceStyle = finalStyle
         
         // 2. 제미나이 API 준비
-        let apiKey = Bundle.main.geminiApiKey 
+        let apiKey = Bundle.main.geminiApiKey
         if apiKey.isEmpty {
             self.errorMessage = "API 키가 누락되었습니다."
             self.isProcessingVoiceCode = false

@@ -1,84 +1,94 @@
 #include "ARBubbleRenderer.hpp"
-#include <iostream>
-#include <algorithm> 
+#include <algorithm>
 
-ARBubbleRenderer::ARBubbleRenderer()
-{
-}
-
-ARBubbleRenderer::~ARBubbleRenderer()
-{
-}
-
-void ARBubbleRenderer::UpdateWords(const std::vector<ARWordData>& words) 
-{
+void ARBubbleRenderer::UpdateWords(const std::vector<ARWordData>& words) {
     currentWords = words;
 }
 
-void ARBubbleRenderer::Render(float screenWidth, float screenHeight) 
-{
-    for (ARWordData wordData : currentWords) {
-        // 1. 실제 화면 픽셀 좌표 계산
+void ARBubbleRenderer::Render(cv::Mat& frame) {
+    if (frame.empty()) return;
+
+    int screenWidth = frame.cols;
+    int screenHeight = frame.rows;
+
+    for (const auto& wordData : currentWords) {
         float absoluteX = wordData.relativeX * screenWidth;
         float absoluteY = wordData.relativeY * screenHeight;
 
-        // 2. 폰트 크기 세팅
-        float wordFontSize = 18.0f;
-        float pronFontSize = 14.0f;
-        float meaningFontSize = 14.0f;
+        // OpenCV 폰트 설정
+        int fontFace = cv::FONT_HERSHEY_SIMPLEX;
+        double wordFontScale = 0.7;
+        double subFontScale = 0.5;
+        int thickness = 1;
 
-        // 3. 텍스트 너비 계산
-        float wordWidth = CalculateTextWidth(wordData.word, wordFontSize);
-        float pronWidth = CalculateTextWidth(wordData.pronunciation, pronFontSize);
-        float meaningWidth = CalculateTextWidth(wordData.meaning, meaningFontSize);
+        // 텍스트 너비 계산 (cv::getTextSize 활용)
+        int wordWidth = CalculateTextWidth(wordData.word, wordFontScale, thickness);
+        int pronWidth = CalculateTextWidth(wordData.pronunciation, subFontScale, thickness);
+        int meaningWidth = CalculateTextWidth(wordData.meaning, subFontScale, thickness);
 
-        // 4. 가장 긴 텍스트 기준 말풍선 크기 결정
-        float maxTextWidth = std::max({ wordWidth, pronWidth, meaningWidth });
+        int maxTextWidth = std::max({ wordWidth, pronWidth, meaningWidth });
 
-        float paddingX = 16.0f;
-        float paddingY = 12.0f;
-        float lineSpacing = 6.0f;
+        int paddingX = 20;
+        int paddingY = 15;
+        int lineSpacing = 10;
 
-        float bubbleWidth = maxTextWidth + (paddingX * 2.0f);
-        float bubbleHeight = wordFontSize + pronFontSize + meaningFontSize
-            + (lineSpacing * 2.0f) + (paddingY * 2.0f);
-        float cornerRadius = 10.0f;
+        // 텍스트 높이 추정 (기준 픽셀)
+        int baseTextHeight = 15;
 
-        // 5. 말풍선 시작점
-        float startX = absoluteX - (bubbleWidth / 2.0f);
-        float startY = absoluteY - bubbleHeight - 20.0f;
+        int bubbleWidth = maxTextWidth + (paddingX * 2);
+        int bubbleHeight = (baseTextHeight * 3) + (lineSpacing * 2) + (paddingY * 2);
 
-        // 6. 반투명 배경 렌더링
-        DrawRoundedRect(startX, startY, bubbleWidth, bubbleHeight, cornerRadius, 0.0f, 0.0f, 0.0f, 0.6f);
+        // 말풍선 사각형 영역 정의
+        int startX = absoluteX - (bubbleWidth / 2);
+        int startY = absoluteY - bubbleHeight - 30; // 객체보다 살짝 위에 띄움
 
-        // 7. 텍스트 렌더링
-        float textStartX = startX + paddingX;
-        float currentTextY = startY + paddingY;
+        // 화면 밖으로 나가지 않도록 예외 처리
+        startX = std::max(0, std::min(startX, screenWidth - bubbleWidth));
+        startY = std::max(0, std::min(startY, screenHeight - bubbleHeight));
 
-        DrawTextLabel(wordData.word, textStartX, currentTextY, wordFontSize);
-        currentTextY += wordFontSize + lineSpacing;
+        cv::Rect bubbleRect(startX, startY, bubbleWidth, bubbleHeight);
 
-        DrawTextLabel(wordData.pronunciation, textStartX, currentTextY, pronFontSize);
-        currentTextY += pronFontSize + lineSpacing;
+        // 1. 반투명 배경 렌더링 (검은색, 투명도 60%)
+        DrawTransparentRoundedRect(frame, bubbleRect, cv::Scalar(0, 0, 0), 15, 0.6);
 
-        DrawTextLabel(wordData.meaning, textStartX, currentTextY, meaningFontSize);
+        // 2. 텍스트 렌더링 (흰색)
+        cv::Scalar textColor(255, 255, 255);
+        int textX = startX + paddingX;
+        int currentY = startY + paddingY + baseTextHeight;
+
+        DrawTextLabel(frame, wordData.word, cv::Point(textX, currentY), wordFontScale, textColor);
+        currentY += baseTextHeight + lineSpacing;
+
+        DrawTextLabel(frame, wordData.pronunciation, cv::Point(textX, currentY), subFontScale, textColor);
+        currentY += baseTextHeight + lineSpacing;
+
+        DrawTextLabel(frame, wordData.meaning, cv::Point(textX, currentY), subFontScale, textColor);
     }
 }
 
-// --- 아래 3개의 헬퍼 함수는 사용하시는 그래픽스 라이브러리에 맞춰 작성 ---
-
-float ARBubbleRenderer::CalculateTextWidth(const std::string& text, float fontSize) 
-{
-    // 임시 가라 로직. 실제로는 엔진의 글꼴 렌더링 API를 호출하여 픽셀 길이를 구함
-    return text.length() * (fontSize * 0.5f);
+int ARBubbleRenderer::CalculateTextWidth(const std::string& text, double fontScale, int thickness) {
+    int baseline = 0;
+    cv::Size textSize = cv::getTextSize(text, cv::FONT_HERSHEY_SIMPLEX, fontScale, thickness, &baseline);
+    return textSize.width;
 }
 
-void ARBubbleRenderer::DrawRoundedRect(float x, float y, float width, float height, float cornerRadius, float r, float g, float b, float alpha) 
-{
-    // TODO: 사각형 그리기 로직
+void ARBubbleRenderer::DrawTransparentRoundedRect(cv::Mat& frame, cv::Rect rect, cv::Scalar color, int cornerRadius, double alpha) {
+    // 투명도 적용을 위해 원본 프레임을 복사하여 오버레이 생성
+    cv::Mat overlay;
+    frame.copyTo(overlay);
+
+    // 둥근 사각형을 그리기 위한 내부 로직 (단순화를 위해 일반 꽉 찬 사각형 위에 둥근 모서리 덮어쓰기)
+    cv::rectangle(overlay, cv::Point(rect.x + cornerRadius, rect.y), cv::Point(rect.x + rect.width - cornerRadius, rect.y + rect.height), color, cv::FILLED);
+    cv::rectangle(overlay, cv::Point(rect.x, rect.y + cornerRadius), cv::Point(rect.x + rect.width, rect.y + rect.height - cornerRadius), color, cv::FILLED);
+    cv::circle(overlay, cv::Point(rect.x + cornerRadius, rect.y + cornerRadius), cornerRadius, color, cv::FILLED);
+    cv::circle(overlay, cv::Point(rect.x + rect.width - cornerRadius, rect.y + cornerRadius), cornerRadius, color, cv::FILLED);
+    cv::circle(overlay, cv::Point(rect.x + cornerRadius, rect.y + rect.height - cornerRadius), cornerRadius, color, cv::FILLED);
+    cv::circle(overlay, cv::Point(rect.x + rect.width - cornerRadius, rect.y + rect.height - cornerRadius), cornerRadius, color, cv::FILLED);
+
+    // 원본 프레임과 오버레이를 alpha 값에 따라 합성
+    cv::addWeighted(overlay, alpha, frame, 1.0 - alpha, 0, frame);
 }
 
-void ARBubbleRenderer::DrawTextLabel(const std::string& text, float x, float y, float fontSize) 
-{
-    // TODO: 텍스트 그리기 로직
+void ARBubbleRenderer::DrawTextLabel(cv::Mat& frame, const std::string& text, cv::Point position, double fontScale, cv::Scalar color) {
+    cv::putText(frame, text, position, cv::FONT_HERSHEY_SIMPLEX, fontScale, color, 1, cv::LINE_AA);
 }

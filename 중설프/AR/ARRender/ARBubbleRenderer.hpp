@@ -1,6 +1,7 @@
 #ifndef ARBubbleRenderer_hpp
 #define ARBubbleRenderer_hpp
 
+#include <opencv2/opencv.hpp>
 #include <string>
 #include <vector>
 
@@ -16,16 +17,18 @@ class ARBubbleRenderer {
 private:
     std::vector<ARWordData> currentWords;
 
-    float CalculateTextWidth(const std::string& text, float fontSize);
-    void DrawRoundedRect(float x, float y, float width, float height, float cornerRadius, float r, float g, float b, float alpha);
-    void DrawTextLabel(const std::string& text, float x, float y, float fontSize);
+    // ³»ºÎ ·»´õ¸µ ÇïÆÛ ÇÔ¼ö
+    int CalculateTextWidth(const std::string& text, double fontScale, int thickness);
+    void DrawTransparentRoundedRect(cv::Mat& frame, cv::Rect rect, cv::Scalar color, int cornerRadius, double alpha);
+    void DrawTextLabel(cv::Mat& frame, const std::string& text, cv::Point position, double fontScale, cv::Scalar color);
 
 public:
-    ARBubbleRenderer();
-    ~ARBubbleRenderer();
+    ARBubbleRenderer() = default;
+    ~ARBubbleRenderer() = default;
 
     void UpdateWords(const std::vector<ARWordData>& words);
-    void Render(float screenWidth, float screenHeight);
+
+    void Render(cv::Mat& frame);
 };
 
 #endif /* ARBubbleRenderer_hpp */

@@ -1,20 +1,18 @@
 #import "ARBridge.h"
 #import "ARBubbleRenderer.hpp"
+#import <opencv2/opencv.hpp>
+#import <opencv2/imgcodecs/ios.h> // iOS 전용 OpenCV 컨버터
 
-// C++ 렌더러 인스턴스
 static ARBubbleRenderer renderer;
 static std::vector<ARWordData> tempWords;
 
-void C_ClearARWords() 
-{
+void C_ClearARWords() {
     tempWords.clear();
     renderer.UpdateWords(tempWords);
 }
 
-void C_UpdateARWords(const char* word, const char* pron, const char* meaning, float relX, float relY) 
-{
+void C_UpdateARWords(const char* word, const char* pron, const char* meaning, float relX, float relY) {
     ARWordData data;
-    // Null 체크 후 C++ string으로 안전하게 변환
     data.word = word ? word : "";
     data.pronunciation = pron ? pron : "";
     data.meaning = meaning ? meaning : "";
@@ -25,7 +23,18 @@ void C_UpdateARWords(const char* word, const char* pron, const char* meaning, fl
     renderer.UpdateWords(tempWords);
 }
 
-void C_RenderBubbles(float screenWidth, float screenHeight) 
-{
-    renderer.Render(screenWidth, screenHeight);
+UIImage* C_RenderBubblesOnImage(UIImage* inputImage) {
+    if (!inputImage) return nil;
+
+    cv::Mat frame;
+    // 1. UIImage -> cv::Mat 변환
+    UIImageToMat(inputImage, frame);
+
+    // 2. C++ 렌더러를 통해 프레임 위에 말풍선 그리기
+    renderer.Render(frame);
+
+    // 3. cv::Mat -> UIImage 변환하여 Swift로 반환
+    UIImage* resultImage = MatToUIImage(frame);
+    
+    return resultImage;
 }

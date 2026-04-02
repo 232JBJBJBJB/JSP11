@@ -11,7 +11,7 @@ void ARBubbleRenderer::Render(cv::Mat& frame) {
     int screenWidth = frame.cols;
     int screenHeight = frame.rows;
 
-    for (const auto& wordData : currentWords) {
+    for (ARWordData wordData : currentWords) {
         float absoluteX = wordData.relativeX * screenWidth;
         float absoluteY = wordData.relativeY * screenHeight;
 

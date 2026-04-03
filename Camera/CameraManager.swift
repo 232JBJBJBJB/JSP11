@@ -3,7 +3,7 @@ import SwiftUI
 import Combine
 import CoreImage
 
-// 🌟 클래스 전체를 UI 업데이트에 안전한 Main 스레드 환경으로 선언!
+
 @MainActor
 class CameraManager: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     @Published var session = AVCaptureSession()

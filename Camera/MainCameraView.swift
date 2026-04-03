@@ -1,106 +1,107 @@
 import SwiftUI
 
 struct MainCameraView: View {
-    @StateObject private var cameraManager = CameraManager()
-    @StateObject private var arViewModel = ARViewModel()
-    
-    // 🌟 [핵심 1] 온보딩에서 폰 메모리에 저장해 둔 '목표 언어'를 꺼내오기!
+    // 🌟 필요한 매니저들만 깔끔하게 고용!
+    @StateObject private var wordVM = WordViewModel()
+    @StateObject private var networkManager = ARNetworkManager()
     @AppStorage("targetLanguage") private var targetLanguage: String = "영어"
     
+    let posOptions = ["명사", "동사", "형용사", "부사"]
+
     var body: some View {
         ZStack {
-            if cameraManager.isAuthorized {
-                CameraPreview(session: cameraManager.session)
-                    .ignoresSafeArea()
-                
-                VStack {
-                    Spacer()
+            // 1. 카메라 배경 (CameraManager.shared 사용 유지)
+            CameraPreview(cameraManager: CameraManager.shared)
+                .ignoresSafeArea()
+
+            VStack {
+                // 2. 🏷️ 품사 선택 상단 UI (추가된 기능)
+                VStack(spacing: 8) {
+                    Text("인식할 품사 카테고리를 선택하세요")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                     
-                    // 🌟 결과 창: 제미나이가 찾은 단어들 띄워주기 (기존과 동일)
-                    if !arViewModel.discoveredWords.isEmpty {
-                        VStack(spacing: 10) {
-                            Text("✨ 발견된 단어들")
+                    Picker("품사", selection: $wordVM.selectedPos) {
+                        ForEach(posOptions, id: \.self) { pos in
+                            Text(pos).tag(pos)
+                        }
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                }
+                .padding()
+                .background(BlurView(style: .systemMaterial))
+                .cornerRadius(15)
+                .padding()
+
+                Spacer()
+                
+                // 3. 🎯 실시간 AR 단어 표시 (기존 기능 유지 + 필터링 추가)
+                if let target = networkManager.targetCoordinate {
+                    // 필터링된 단어장(filteredWords)에서 서버 좌표 ID와 맞는 단어 검색
+                    if let wordToShow = wordVM.filteredWords.first(where: { $0.id == target.word_id }) {
+                        VStack {
+                            Text(wordToShow.term) // 단어 표시
+                                .font(.system(size: 45, weight: .black, design: .rounded))
+                                .foregroundColor(.yellow)
+                                .shadow(color: .black, radius: 2)
+                            
+                            Text(wordToShow.meaning) // 뜻 표시
                                 .font(.headline)
                                 .foregroundColor(.white)
-                            
-                            ForEach(arViewModel.discoveredWords) { word in
-                                HStack {
-                                    Text(word.word)
-                                        .font(.title2).bold()
-                                    Text("(\(word.pronunciation))")
-                                        .foregroundColor(.gray)
-                                    Spacer()
-                                    Text(word.meaning)
-                                }
-                                .padding()
-                                .background(Color.white.opacity(0.9))
-                                .cornerRadius(10)
-                                .foregroundColor(.black)
-                            }
+                                .padding(.horizontal, 10)
+                                .background(Color.black.opacity(0.5))
+                                .cornerRadius(5)
                         }
-                        .padding()
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(20)
-                        .padding(.horizontal)
+                        .position(x: CGFloat(target.screenX), y: CGFloat(target.screenY))
+                    }
+                }
+                
+                Spacer()
+                
+                // 4. 하단 제어 및 분석 버튼 (기존 기능 유지)
+                HStack(spacing: 20) {
+                    // 연결 상태 버튼
+                    Button(action: {
+                        networkManager.isConnected ? networkManager.disconnect() : networkManager.connect()
+                    }) {
+                        Image(systemName: networkManager.isConnected ? "bolt.fill" : "bolt.slash.fill")
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(networkManager.isConnected ? Color.green : Color.gray)
+                            .clipShape(Circle())
                     }
                     
-                    // 🌟 하단: AI 분석 버튼
+                    // 분석 시작 버튼 (기존 제미나이 분석 기능 유지)
                     Button(action: {
-                        guard let image = cameraManager.currentFrame else { return }
-                        
-                        Task {
-                            // 🌟 [핵심 2] "일본어"라고 고정했던 자리에 targetLanguage 변수를 쏙!
-                            await arViewModel.analyzeScene(image: image, targetLanguage: targetLanguage)
-                        }
+                        wordVM.loadWords() // 최신 단어장 갱신
                     }) {
-                        HStack {
-                            if arViewModel.isAnalyzing {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                Text(" AI가 분석 중...")
-                            } else {
-                                Image(systemName: "wand.and.stars")
-                                Text("이 공간 분석하기")
-                            }
-                        }
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(arViewModel.isAnalyzing ? Color.gray : Color.blue)
-                        .cornerRadius(15)
-                        .padding(.horizontal, 30)
-                        .padding(.bottom, 30)
+                        Text("새로운 환경 분석하기")
+                            .bold()
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
                     }
-                    .disabled(arViewModel.isAnalyzing)
                 }
-                
-                // 에러 창 (기존과 동일)
-                if let error = arViewModel.errorMessage {
-                    VStack {
-                        Text("오류 발생 🚨").bold()
-                        Text(error).multilineTextAlignment(.center)
-                    }
-                    .padding()
-                    .background(Color.red.opacity(0.8))
-                    .foregroundColor(.white)
-                    .cornerRadius(10)
-                    .transition(.move(edge: .top))
-                    .animation(.easeInOut, value: arViewModel.errorMessage)
-                }
-                
-            } else {
-                VStack {
-                    Image(systemName: Constants.Icons.cameraSlash)
-                        .font(.system(size: 50))
-                        .foregroundColor(.gray)
-                    Text(Constants.Labels.cameraNoPermission)
-                        .padding()
-                }
+                .padding(.horizontal, 30)
+                .padding(.bottom, 30)
             }
         }
         .onAppear {
-            cameraManager.checkPermission()
+            networkManager.connect() // 시작 시 자동 연결
+        }
+        .onDisappear {
+            networkManager.disconnect() // 종료 시 배터리 보호
         }
     }
+}
+
+// 블러 뷰는 별도 구조체로 유지
+struct BlurView: UIViewRepresentable {
+    var style: UIBlurEffect.Style
+    func makeUIView(context: Context) -> UIVisualEffectView {
+        UIVisualEffectView(effect: UIBlurEffect(style: style))
+    }
+    func updateUIView(_ uiView: UIVisualEffectView, context: Context) {}
 }

@@ -1,0 +1,12 @@
+[core]
+	bare = false
+	repositoryformatversion = 0
+	filemode = true
+	ignorecase = true
+	precomposeunicode = true
+	logallrefupdates = true
+[remote "origin"]
+	url = https://github.com/232JBJBJB/JSP11.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[lfs]
+	repositoryformatversion = 0

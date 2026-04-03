@@ -2,104 +2,85 @@ import Foundation
 import SwiftUI
 import Combine
 
-@MainActor // 화면(UI)을 바꾸는 작업이 많아서 안전하게 메인 스레드에서 돌리도록 명시!
+@MainActor
 class WordViewModel: ObservableObject {
-    // 🌟 퓨전(통합)된 완전체 'Word' 모델 하나만 사용!
+    // 🌟 가짜 로컬 DB 역할 (앱이 켜져 있는 동안 여기에 단어가 저장됨)
     @Published var words: [Word] = []
     
-    // 검색용 텍스트 (UI 연결용 & 실제 검색용)
+    // 🔍 검색 및 품사 필터 변수
     @Published var searchText: String = ""
     @Published var debouncedSearchText: String = ""
+    
+    // 🌟 [최적화] 카메라 뷰랑 똑같이 기본값을 "표준"으로 맞춰야 시작할 때 충돌이 안 나!
+    @Published var selectedPos: String = "표준"
     
     @Published var isLoading = false
     
     init() {
-        // 검색 파이프라인 (0.3초 대기 후 검색어 확정)
+        // 검색 파이프라인: 0.3초 대기 후 검색어 확정
         $searchText
             .debounce(for: .seconds(0.3), scheduler: RunLoop.main)
             .assign(to: &$debouncedSearchText)
+        
+        loadWords() // 시작할 때 데이터 불러오기
     }
     
-    // 🔍 검색 필터링 (통합된 Word의 속성인 'term'과 'meaning' 사용)
+    // MARK: - 🌟 핵심 필터링 로직
     var filteredWords: [Word] {
-        if debouncedSearchText.isEmpty {
-            return words
-        } else {
-            return words.filter { word in
-                word.term.lowercased().contains(debouncedSearchText.lowercased()) ||
-                word.meaning.lowercased().contains(debouncedSearchText.lowercased())
-            }
+        words.filter { word in
+            // 1. "표준"이면 다 보여주고, 아니면 품사가 일치하는지 확인
+            let matchesPos = (selectedPos == "표준") || (word.pos == selectedPos)
+            
+            // 2. 검색어가 포함되는지 확인
+            let matchesSearch = debouncedSearchText.isEmpty ||
+                                word.term.lowercased().contains(debouncedSearchText.lowercased()) ||
+                                word.meaning.lowercased().contains(debouncedSearchText.lowercased())
+            
+            // 두 조건을 모두 만족해야 화면에 나타남
+            return matchesPos && matchesSearch
         }
     }
     
-    // 📥 [GET] AWS 서버에서 단어장 싹 다 당겨오기
+    // MARK: - 📥 [가짜 GET] 로컬 메모리에서 단어장 불러오기
     func loadWords() {
-        Task {
-            isLoading = true
-            do {
-                self.words = try await APIManager.shared.fetchWords()
-            } catch {
-                print("\(Constants.Errors.networkErrorPrefix) \(error.localizedDescription)")
-            }
-            isLoading = false
-        }
+        // 지금은 로컬 배열(words)을 쓰니까 서버에서 가져올 필요 없음!
+        print("💾 [로컬 DB] 단어장 로드 완료 (현재 \(words.count)개)")
     }
     
-    // 📤 [POST] AWS 서버에 새 단어 추가하기
-    func addWord(term: String, meaning: String) async -> Bool {
-        // 중복 체크 (방어막 유지 - 이제 term으로 비교!)
+    // MARK: - 📤 [가짜 POST] 로컬 배열에 새 단어 추가하기
+    func addWord(term: String, meaning: String, pos: String = "명사") async -> Bool {
         if words.contains(where: { $0.term.lowercased() == term.lowercased() }) {
-            print("💡 이미 저장된 단어라서 서버에 보내지 않음!")
+            print("💡 이미 저장된 단어입니다.")
             return false
         }
         
-        // 🌟 통합된 Word 구조체로 생성 (나머지 발음, 예문 등은 구조체 기본값이 들어감)
-        let newWord = Word(term: term, meaning: meaning)
+        let newWord = Word(term: term, meaning: meaning, pos: pos)
         
-        do {
-            try await APIManager.shared.saveWord(word: newWord)
-            loadWords() // 저장 성공 시, 서버에서 최신 목록 다시 불러오기
-            return true
-        } catch {
-            print("\(Constants.Errors.networkErrorPrefix) \(error.localizedDescription)")
-            return false
-        }
+        // AWS 대신 내 핸드폰(배열)에 바로 저장!
+        self.words.append(newWord)
+        print("💾 [로컬 DB] '\(term)' 저장 성공!")
+        return true
     }
     
-    // 🗑️ [DELETE] AWS 서버에서 단어 지우기
+    // MARK: - 🗑️ [가짜 DELETE] 로컬 배열에서 단어 지우기
     func deleteWord(at offsets: IndexSet) {
-        Task {
-            for index in offsets {
-                let wordToDelete = words[index]
-                // 서버 DB에 삭제 요청을 하려면 고유 ID가 필요해!
-                guard let wordId = wordToDelete.id else { continue }
-                
-                do {
-                    try await APIManager.shared.deleteWord(wordId: wordId)
-                } catch {
-                    print("\(Constants.Errors.networkErrorPrefix) 삭제 실패: \(error.localizedDescription)")
-                }
-            }
-            loadWords() // 지우고 나서 목록 새로고침
-        }
+        // AWS 삭제 통신 제거하고 배열에서 바로 쓱싹!
+        words.remove(atOffsets: offsets)
+        print("💾 [로컬 DB] 단어 삭제 성공!")
     }
     
-    // 🔄 [PUT] AWS 서버에 단어 수정/업데이트하기 (상세 화면에서 수정 시 호출)
+    // MARK: - 🔄 [가짜 PUT] 로컬 배열의 단어 수정/업데이트하기
     func updateWord(word: Word) {
-        Task {
-            do {
-                try await APIManager.shared.updateWord(word: word)
-                loadWords()
-            } catch {
-                print("\(Constants.Errors.networkErrorPrefix) 업데이트 실패: \(error.localizedDescription)")
-            }
+        if let index = words.firstIndex(where: { $0.id == word.id }) {
+            words[index] = word
+            print("💾 [로컬 DB] 단어 업데이트 성공!")
         }
     }
     
-    // ⭐ [PUT] 즐겨찾기(별표) 토글
+    // ⭐ 즐겨찾기(별표) 토글
     func toggleMemorized(word: Word) {
         var updatedWord = word
-        updatedWord.isMemorized.toggle() // 별표 상태 반전!
-        updateWord(word: updatedWord)    // 바뀐 상태를 서버로 전송
+        updatedWord.isMemorized.toggle()
+        updateWord(word: updatedWord)
     }
 }

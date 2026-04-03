@@ -1,11 +1,15 @@
-import AVFoundation
+// 🌟 [복구 1] 마법의 키워드: AVFoundation 깐깐한 스레드 검사에서 제외!
+@preconcurrency import AVFoundation
 import SwiftUI
 import Combine
 import CoreImage
 
-
 @MainActor
 class CameraManager: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleBufferDelegate {
+    
+    // 🌟 [조원 코드 호환] 조원이 카메라 뷰에서 .shared를 썼으므로 싱글톤 인스턴스 추가!
+    static let shared = CameraManager()
+    
     @Published var session = AVCaptureSession()
     @Published var isAuthorized = false
     @Published var currentFrame: UIImage? = nil
@@ -14,19 +18,18 @@ class CameraManager: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleB
     private let videoQueue = DispatchQueue(label: "camera.videoQueue", qos: .userInitiated)
     private let ciContext = CIContext() // 이미지 변환 엔진
     
-    // 1. 권한 체크 (최신 문법으로 깔끔하게 정리)
+    // 1. 권한 체크
     func checkPermission() {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
             self.isAuthorized = true
-            // 백그라운드에서 카메라 세팅 실행
-            Task.detached { await self.setupCamera() }
+            Task { await self.setupCamera() }
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { granted in
                 Task { @MainActor in
                     self.isAuthorized = granted
                     if granted {
-                        Task.detached { await self.setupCamera() }
+                        await self.setupCamera()
                     }
                 }
             }
@@ -35,42 +38,63 @@ class CameraManager: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleB
         }
     }
     
-    // 2. 카메라 세팅 (백그라운드에서 안전하게 실행되도록 nonisolated 적용)
-    nonisolated private func setupCamera() async {
-        // UI 변경을 위해 잠시 MainActor로 전환하여 session 접근
-        await MainActor.run {
-            session.beginConfiguration()
-            
-            guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-                  let input = try? AVCaptureDeviceInput(device: device) else {
-                return
-            }
-            
-            if session.canAddInput(input) {
-                session.addInput(input)
-            }
-            
-            let videoOutput = AVCaptureVideoDataOutput()
-            
-            // 바구니에 데이터가 찰 때마다 'videoQueue(백그라운드)'에서 처리하라고 지시!
-            videoOutput.setSampleBufferDelegate(self, queue: videoQueue)
-            
-            if session.canAddOutput(videoOutput) {
-                session.addOutput(videoOutput)
-            }
-            
-            session.commitConfiguration()
-            
-            // 카메라 작동 시작은 백그라운드 스레드에서 해야 경고(보라색 에러)가 안 뜸!
-            let currentSession = self.session
-            
-            DispatchQueue.global(qos: .background).async {
-                self.session.startRunning()
+    // 2. 카메라 세팅 (쓸데없는 래핑 제거하고 깔끔하게 최적화)
+    private func setupCamera() async {
+        session.beginConfiguration()
+        
+        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+              let input = try? AVCaptureDeviceInput(device: device) else {
+            return
+        }
+        
+        if session.canAddInput(input) {
+            session.addInput(input)
+        }
+        
+        let videoOutput = AVCaptureVideoDataOutput()
+        // 바구니에 데이터가 찰 때마다 'videoQueue'에서 처리
+        videoOutput.setSampleBufferDelegate(self, queue: videoQueue)
+        
+        if session.canAddOutput(videoOutput) {
+            session.addOutput(videoOutput)
+        }
+        
+        session.commitConfiguration()
+        
+        // 🌟 [복구 2] 스레드 안전성 보장 (미리 꺼내서 백그라운드에 넘기기)
+        let currentSession = self.session
+        videoQueue.async {
+            currentSession.startRunning()
+        }
+    }
+    
+    // ==========================================
+    // 🌟 [복구 3] 찰칵 모션 & 하드웨어 제어용 함수 부활!
+    // ==========================================
+    
+    // 🛑 카메라 일시 정지 (캡처 화면 띄울 때 호출)
+    func stopSession() {
+        let currentSession = self.session // 스레드 격리 완벽 준수
+        videoQueue.async {
+            if currentSession.isRunning {
+                currentSession.stopRunning()
+                print("💤 카메라 세션을 잠재웁니다 (배터리 절약)")
             }
         }
     }
     
-    // 3. 📸 데이터 바구니 (무거운 작업이므로 UI를 방해하지 않게 nonisolated 선언!)
+    // ▶️ 카메라 다시 시작 (다시 라이브로 돌아올 때 호출)
+    func startSession() {
+        let currentSession = self.session
+        videoQueue.async {
+            if !currentSession.isRunning {
+                currentSession.startRunning()
+                print("🚀 카메라 세션을 다시 깨웁니다")
+            }
+        }
+    }
+    
+    // 3. 📸 데이터 바구니 (무거운 작업이므로 UI를 방해하지 않게 nonisolated)
     nonisolated func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
@@ -79,7 +103,7 @@ class CameraManager: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleB
         guard let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) else { return }
         let uiImage = UIImage(cgImage: cgImage, scale: 1.0, orientation: .right)
         
-        // 🌟 무거운 변환 작업은 다 끝났으니, 가벼워진 완성본(uiImage)만 메인 화면으로 쏙! 던져주기
+        // 완성본 메인 화면으로 던지기
         Task { @MainActor in
             self.currentFrame = uiImage
         }

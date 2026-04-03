@@ -8,7 +8,7 @@ struct Word: Identifiable, Codable {
     // 핵심 데이터
     var term: String
     var meaning: String
-    
+    var pos: String?   
     // 학습 관련 데이터
     var isMemorized: Bool = false
     var isRevealed: Bool = false

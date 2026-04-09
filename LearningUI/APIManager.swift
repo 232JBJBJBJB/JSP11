@@ -1,22 +1,21 @@
 import Foundation
 
 class APIManager {
-    // 앱 전체에서 돌려쓸 수 있는 단 하나의 택배 기사님
     static let shared = APIManager()
     
-    // 💡 1번 조원이 AWS 서버 켜면 여기 주소를 알려줄 거야! (지금은 가짜 주소)
-    private let baseURL = "http://localhost:8080/api"
+    // 💡 집 와이파이 주소로 업데이트됨!
+    private let baseURL = "http://192.168.219.102:8080/api"
     
-    private init() {} // 외부에서 함부로 기사님 새로 못 만들게 막기
+    private init() {}
     
-    // 📥 [GET] AWS에서 내 단어 싹 다 가져오기
+    // 📥 [GET] 단어 싹 다 가져오기
     func fetchWords() async throws -> [Word] {
         guard let url = URL(string: "\(baseURL)/words") else { throw URLError(.badURL) }
         let (data, _) = try await URLSession.shared.data(from: url)
         return try JSONDecoder().decode([Word].self, from: data)
     }
     
-    // 📤 [POST] AWS에 새 단어 저장하기
+    // 📤 [POST] 새 단어 저장하기
     func saveWord(word: Word) async throws {
         guard let url = URL(string: "\(baseURL)/words") else { throw URLError(.badURL) }
         var request = URLRequest(url: url)
@@ -27,9 +26,9 @@ class APIManager {
         let (_, _) = try await URLSession.shared.data(for: request)
     }
     
-    // 🗑️ [DELETE] AWS에서 단어 삭제하기
-    func deleteWord(wordId: String) async throws {
-        // 예: 주소/words/아이디값
+    // 🗑️ [수정됨] wordId 타입을 String에서 Int64로 변경!
+    func deleteWord(wordId: Int64) async throws {
+        // 숫자인 wordId를 문자열 주소 안에 넣을 땐 \(wordId)라고 쓰면 자동으로 변환돼!
         guard let url = URL(string: "\(baseURL)/words/\(wordId)") else { throw URLError(.badURL) }
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
@@ -37,8 +36,9 @@ class APIManager {
         let (_, _) = try await URLSession.shared.data(for: request)
     }
     
-    // 🔄 [PUT] AWS에 단어 정보 업데이트하기 (별표 쳤을 때 등)
+    // 🔄 [수정됨] word.id가 이제 Int64? 타입이므로 이에 맞춰 업데이트
     func updateWord(word: Word) async throws {
+        // word.id에서 숫자를 꺼내와서 주소를 만들어
         guard let wordId = word.id, let url = URL(string: "\(baseURL)/words/\(wordId)") else {
             throw URLError(.badURL)
         }

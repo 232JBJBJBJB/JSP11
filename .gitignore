@@ -1,7 +1,8 @@
 # 파일명만 적어서 어디에 있든 무시하게 만들기
 Secrets.plist
 GoogleService-Info.plist
-
+# 대용량 프레임워크 무시
+opencv2.framework/
 # Xcode & macOS 시스템 파일
 build/
 DerivedData/

@@ -107,7 +107,7 @@ class WordViewModel: ObservableObject {
     // ⭐ 즐겨찾기(별표) 토글
     func toggleMemorized(word: Word) {
         var updatedWord = word
-        updatedWord.isMemorized.toggle()
+        updatedWord.isMemorized = !(updatedWord.isMemorized ?? false)
         updateWord(word: updatedWord)
     }
 }

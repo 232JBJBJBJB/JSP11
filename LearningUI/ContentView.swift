@@ -1,68 +1,7 @@
 import SwiftUI
 
-// MARK: - [1] 상세 화면 (WordDetailView)
-struct WordDetailView: View {
-    @EnvironmentObject var viewModel: WordViewModel
-    @State private var word: Word
-    @State private var isEditing = false
-    
-    init(word: Word) {
-        _word = State(initialValue: word)
-    }
-    
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // 1. 헤더 블록 (단어 + 스피커)
-                WordDetailHeaderView(word: $word, isEditing: isEditing)
-                
-                Divider()
-                
-                // 2. 상세 내용 블록 (뜻, 발음, 예문)
-                WordDetailContentView(word: $word, isEditing: isEditing)
-            }
-            .padding()
-        }
-        .navigationTitle(isEditing ? Constants.Labels.editMode : Constants.Labels.wordDetail)
-        .onTapGesture { hideKeyboard() }
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                editToggleButton
-            }
-        }
-    }
-    
-    private var editToggleButton: some View {
-        Button(action: {
-            if isEditing {
-                if word.term.trimmingCharacters(in: .whitespaces).isEmpty ||
-                   word.meaning.trimmingCharacters(in: .whitespaces).isEmpty {
-                    return
-                }
-                // 🌟 [수정 완료 시] 뷰모델이 스스로 Task를 처리하므로 바로 호출!
-                viewModel.updateWord(word: word)
-            }
-            isEditing.toggle()
-        }) {
-            Image(systemName: isEditing ? Constants.Icons.check : Constants.Icons.gear)
-                .foregroundStyle(
-                    isEditing && (word.term.trimmingCharacters(in: .whitespaces).isEmpty || word.meaning.trimmingCharacters(in: .whitespaces).isEmpty)
-                    ? .gray
-                    : (isEditing ? .green : .gray)
-                )
-        }
-        .disabled(
-            isEditing && (
-                word.term.trimmingCharacters(in: .whitespaces).isEmpty ||
-                word.meaning.trimmingCharacters(in: .whitespaces).isEmpty
-            )
-        )
-    }
-}
-
-// MARK: - [2] 메인 화면 (ContentView)
+// MARK: - [1] 메인 화면 (ContentView)
 struct ContentView: View {
-    // 🌟 [최강 핵심!] 파이어베이스 점장님 해고 완료! 이제 빈 괄호로 깔끔하게 시작!
     @StateObject var viewModel = WordViewModel()
     @StateObject var quizViewModel = QuizViewModel()
     
@@ -73,13 +12,12 @@ struct ContentView: View {
         NavigationStack {
             List {
                 ForEach(viewModel.filteredWords) { word in
+                    // 리스트 줄 하나하나
                     WordListRowView(word: word, onToggleStar: {
-                        // 🌟 뷰모델이 Task를 품고 있어서, View에서는 깔끔하게 함수만 호출!
                         viewModel.toggleMemorized(word: word)
                     })
                 }
                 .onDelete { indexSet in
-                    // 🌟 여기도 귀찮은 Task/await 삭제!
                     viewModel.deleteWord(at: indexSet)
                 }
             }
@@ -109,12 +47,10 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            // 🌟 앱 켜질 때도 깔끔하게 한 줄로 AWS에서 단어 땡겨오기!
             viewModel.loadWords()
         }
     }
     
-    // 🌟 이 녀석만 async 유지! (성공 여부 Bool 값을 받아와서 텍스트를 지워야 하니까)
     private func addNewWord() {
         Task {
             let success = await viewModel.addWord(term: newTerm, meaning: newMeaning)
@@ -126,9 +62,57 @@ struct ContentView: View {
     }
 }
 
+// MARK: - [2] 상세 화면 (WordDetailView)
+struct WordDetailView: View {
+    @EnvironmentObject var viewModel: WordViewModel
+    @State private var word: Word
+    @State private var isEditing = false
+    
+    init(word: Word) {
+        _word = State(initialValue: word)
+    }
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                WordDetailHeaderView(word: $word, isEditing: isEditing)
+                Divider()
+                WordDetailContentView(word: $word, isEditing: isEditing)
+            }
+            .padding()
+        }
+        .navigationTitle(isEditing ? Constants.Labels.editMode : Constants.Labels.wordDetail)
+        .onTapGesture { hideKeyboard() }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                editToggleButton
+            }
+        }
+    }
+    
+    private var editToggleButton: some View {
+        Button(action: {
+            if isEditing {
+                if (word.term ?? "").trimmingCharacters(in: .whitespaces).isEmpty ||
+                   (word.meaning ?? "").trimmingCharacters(in: .whitespaces).isEmpty {
+                    return
+                }
+                viewModel.updateWord(word: word)
+            }
+            isEditing.toggle()
+        }) {
+            Image(systemName: isEditing ? Constants.Icons.check : Constants.Icons.gear)
+                .foregroundStyle(
+                    isEditing && ((word.term ?? "").isEmpty || (word.meaning ?? "").isEmpty)
+                    ? .gray
+                    : (isEditing ? .green : .gray)
+                )
+        }
+        .disabled(isEditing && ((word.term ?? "").isEmpty || (word.meaning ?? "").isEmpty))
+    }
+}
+
 // MARK: - [3] 레고 블록들 (하위 컴포넌트)
-// 👇 이 아래 블록들(WordDetailHeaderView, WordDetailContentView, WordListRowView, AddWordBottomBarView)은
-// 완벽하게 뷰(UI) 역할만 하고 있어서 수정할 곳이 0군데야! 네가 준 코드 그대로 쓰면 돼.
 
 struct WordDetailHeaderView: View {
     @Binding var word: Word
@@ -137,14 +121,17 @@ struct WordDetailHeaderView: View {
     var body: some View {
         HStack {
             if isEditing {
-                TextField(Constants.Labels.editWord, text: $word.term)
-                    .font(.system(size: 40, weight: .bold))
-                    .textFieldStyle(.roundedBorder)
+                TextField(Constants.Labels.editWord, text: Binding(
+                    get: { word.term ?? "" },
+                    set: { word.term = $0 }
+                ))
+                .font(.system(size: 40, weight: .bold))
+                .textFieldStyle(.roundedBorder)
             } else {
-                Text(word.term).font(.system(size: 40, weight: .bold))
+                Text(word.term ?? "").font(.system(size: 40, weight: .bold))
             }
             if !isEditing {
-                Button(action: { SpeechManager.shared.speak(text: word.term) }) {
+                Button(action: { SpeechManager.shared.speak(text: word.term ?? "") }) {
                     Image(systemName: Constants.Icons.speaker)
                         .font(.title).foregroundStyle(.blue)
                 }
@@ -161,14 +148,29 @@ struct WordDetailContentView: View {
         Group {
             Text(Constants.Labels.meaningAndExample).font(.headline).foregroundStyle(.green)
             if isEditing {
-                TextField(Constants.Labels.meaning, text: $word.meaning).textFieldStyle(.roundedBorder)
-                TextField(Constants.Labels.pronunciation, text: $word.pronunciation).textFieldStyle(.roundedBorder)
-                TextField(Constants.Labels.example, text: $word.example).textFieldStyle(.roundedBorder)
+                TextField(Constants.Labels.meaning, text: Binding(
+                    get: { word.meaning ?? "" },
+                    set: { word.meaning = $0 }
+                )).textFieldStyle(.roundedBorder)
+                
+                TextField(Constants.Labels.pronunciation, text: Binding(
+                    get: { word.pronunciation ?? "" },
+                    set: { word.pronunciation = $0 }
+                )).textFieldStyle(.roundedBorder)
+                
+                TextField(Constants.Labels.example, text: Binding(
+                    get: { word.example ?? "" },
+                    set: { word.example = $0 }
+                )).textFieldStyle(.roundedBorder)
             } else {
-                Text(word.meaning).font(.title2)
-                if !word.pronunciation.isEmpty { Text("\(Constants.Labels.pronunciation): \(word.pronunciation)").foregroundStyle(.secondary) }
-                if !word.example.isEmpty {
-                    Text("\(Constants.Labels.example): \(word.example)")
+                Text(word.meaning ?? "").font(.title2)
+                
+                if let pron = word.pronunciation, !pron.isEmpty {
+                    Text("\(Constants.Labels.pronunciation): \(pron)").foregroundStyle(.secondary)
+                }
+                
+                if let ex = word.example, !ex.isEmpty {
+                    Text("\(Constants.Labels.example): \(ex)")
                         .padding().background(Color.white.opacity(0.5)).cornerRadius(8)
                 }
             }
@@ -183,15 +185,13 @@ struct WordListRowView: View {
     var body: some View {
         NavigationLink(destination: WordDetailView(word: word)) {
             HStack {
-                Image(systemName: word.isMemorized ? Constants.Icons.starFill : Constants.Icons.star)
-                    .foregroundStyle(word.isMemorized ? .yellow : .gray)
-                    .onTapGesture {
-                        onToggleStar()
-                    }
+                Image(systemName: (word.isMemorized ?? false) ? Constants.Icons.starFill : Constants.Icons.star)
+                    .foregroundStyle((word.isMemorized ?? false) ? .yellow : .gray)
+                    .onTapGesture { onToggleStar() }
                 
                 VStack(alignment: .leading) {
-                    Text(word.term).bold()
-                    Text(word.meaning)
+                    Text(word.term ?? "").bold()
+                    Text(word.meaning ?? "")
                         .foregroundStyle(.black)
                         .font(.caption)
                         .lineLimit(1)

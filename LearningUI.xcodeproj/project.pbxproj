@@ -9,6 +9,9 @@
 /* Begin PBXBuildFile section */
 		4708B23F2F7F4BB900936F49 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 4708B2342F7F4BB900936F49 /* .gitignore */; };
 		4737EAF12F626EB9007AAA72 /* GoogleGenerativeAI in Frameworks */ = {isa = PBXBuildFile; productRef = 4737EAF02F626EB9007AAA72 /* GoogleGenerativeAI */; };
+		4746E0C32F876A7100F20F89 /* opencv2.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4746E0C22F876A7100F20F89 /* opencv2.framework */; };
+		4754F6A22F875B4A00A9E26E /* ARBubbleRenderer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4754F6A02F875B4A00A9E26E /* ARBubbleRenderer.cpp */; };
+		4754F6A32F875B4A00A9E26E /* ARBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4754F69E2F875B4A00A9E26E /* ARBridge.mm */; };
 		4764D6882F461B060046B5A5 /* QuizView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4764D66C2F3DC4050046B5A5 /* QuizView.swift */; };
 		4764D6892F461B060046B5A5 /* QuizViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4764D6592F3DBE520046B5A5 /* QuizViewModel.swift */; };
 		4764D68A2F461B060046B5A5 /* Word.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4764D6522F3AFBF90046B5A5 /* Word.swift */; };
@@ -36,11 +39,29 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		4754F6AF2F875D2700A9E26E /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		4708B2342F7F4BB900936F49 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 		4708B2422F7F4D9500936F49 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = .gitignore; sourceTree = "<group>"; };
 		470C204C2F49A417004337BF /* LearningUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LearningUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4718C5872F3594E20041E7E9 /* LearningUI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LearningUI.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4746E0C22F876A7100F20F89 /* opencv2.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = opencv2.framework; sourceTree = "<group>"; };
+		4754F69D2F875B4A00A9E26E /* ARBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARBridge.h; sourceTree = "<group>"; };
+		4754F69E2F875B4A00A9E26E /* ARBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ARBridge.mm; sourceTree = "<group>"; };
+		4754F69F2F875B4A00A9E26E /* ARBubbleRenderer.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ARBubbleRenderer.hpp; sourceTree = "<group>"; };
+		4754F6A02F875B4A00A9E26E /* ARBubbleRenderer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ARBubbleRenderer.cpp; sourceTree = "<group>"; };
 		4764D6502F3AFBCE0046B5A5 /* WordViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WordViewModel.swift; sourceTree = "<group>"; };
 		4764D6522F3AFBF90046B5A5 /* Word.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Word.swift; sourceTree = "<group>"; };
 		4764D6592F3DBE520046B5A5 /* QuizViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizViewModel.swift; sourceTree = "<group>"; };
@@ -96,6 +117,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				476C07CD2F626AC700B743CD /* FirebaseFirestore in Frameworks */,
+				4746E0C32F876A7100F20F89 /* opencv2.framework in Frameworks */,
 				4737EAF12F626EB9007AAA72 /* GoogleGenerativeAI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -106,6 +128,8 @@
 		4718C57E2F3594E20041E7E9 = {
 			isa = PBXGroup;
 			children = (
+				4746E0C22F876A7100F20F89 /* opencv2.framework */,
+				4754F6A12F875B4A00A9E26E /* ARBubbleRender */,
 				4708B2422F7F4D9500936F49 /* .gitignore */,
 				4778A4E92F68DE450097CCB1 /* AR */,
 				4778A4D22F63F6060097CCB1 /* etcs */,
@@ -126,6 +150,17 @@
 				470C204C2F49A417004337BF /* LearningUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		4754F6A12F875B4A00A9E26E /* ARBubbleRender */ = {
+			isa = PBXGroup;
+			children = (
+				4754F69D2F875B4A00A9E26E /* ARBridge.h */,
+				4754F69E2F875B4A00A9E26E /* ARBridge.mm */,
+				4754F69F2F875B4A00A9E26E /* ARBubbleRenderer.hpp */,
+				4754F6A02F875B4A00A9E26E /* ARBubbleRenderer.cpp */,
+			);
+			path = ARBubbleRender;
 			sourceTree = "<group>";
 		};
 		4778A4CB2F63F5470097CCB1 /* Camera */ = {
@@ -218,6 +253,7 @@
 				4718C5842F3594E20041E7E9 /* Frameworks */,
 				4718C5852F3594E20041E7E9 /* Resources */,
 				4764D6832F461AE10046B5A5 /* Sources */,
+				4754F6AF2F875D2700A9E26E /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -320,6 +356,8 @@
 				4778A4BB2F62A4F70097CCB1 /* Bundle+Extension.swift in Sources */,
 				4778A4EB2F68E1D60097CCB1 /* ARViewModel.swift in Sources */,
 				47C3C1E92F74010C00503C09 /* ARNetworkManager.swift in Sources */,
+				4754F6A22F875B4A00A9E26E /* ARBubbleRenderer.cpp in Sources */,
+				4754F6A32F875B4A00A9E26E /* ARBridge.mm in Sources */,
 				4778A4BC2F62A4F70097CCB1 /* Constants.swift in Sources */,
 				4778A4D72F63FC160097CCB1 /* MainCameraView.swift in Sources */,
 			);
@@ -506,9 +544,15 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = P7UMP6PT5W;
 				ENABLE_PREVIEWS = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/**",
+					"$(PROJECT_DIR)",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = LearningUI/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "눈앞의 사물을 스캔하여 단어를 생성하기 위해 카메라 권한이 필요합니다.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "서버와 단어 데이터를 동기화하기 위해 로컬 네트워크 권한이 필요합니다.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "현재 위치(예: 카페, 도서관)에 맞는 맞춤형 단어를 제공하기 위해 GPS 정보가 필요합니다.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -518,6 +562,10 @@
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/framework/Versions/A",
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ChatPrototype.LearningUIV3;
@@ -541,9 +589,15 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = P7UMP6PT5W;
 				ENABLE_PREVIEWS = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/**",
+					"$(PROJECT_DIR)",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = LearningUI/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "눈앞의 사물을 스캔하여 단어를 생성하기 위해 카메라 권한이 필요합니다.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "서버와 단어 데이터를 동기화하기 위해 로컬 네트워크 권한이 필요합니다.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "현재 위치(예: 카페, 도서관)에 맞는 맞춤형 단어를 제공하기 위해 GPS 정보가 필요합니다.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -553,6 +607,10 @@
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/framework/Versions/A",
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ChatPrototype.LearningUIV3;

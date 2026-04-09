@@ -17,3 +17,4 @@ extern "C"
 #endif
 
 #endif /* ARBridge_h */
+

@@ -5,7 +5,7 @@ class APIManager {
     static let shared = APIManager()
     
     // 💡 1번 조원이 AWS 서버 켜면 여기 주소를 알려줄 거야! (지금은 가짜 주소)
-    private let baseURL = "http://1번조원서버주소.com/api"
+    private let baseURL = "http://localhost:8080/api"
     
     private init() {} // 외부에서 함부로 기사님 새로 못 만들게 막기
     

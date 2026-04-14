@@ -1,107 +1,302 @@
 import SwiftUI
 
 struct MainCameraView: View {
-    // 🌟 필요한 매니저들만 깔끔하게 고용!
+    // 🌟 1. 앱의 3대장 고용!
+    @StateObject private var cameraManager = CameraManager.shared
+    @StateObject private var arViewModel = ARViewModel()
+    @StateObject private var arNetworkManager = ARNetworkManager()
     @StateObject private var wordVM = WordViewModel()
-    @StateObject private var networkManager = ARNetworkManager()
-    @AppStorage("targetLanguage") private var targetLanguage: String = "영어"
     
-    let posOptions = ["명사", "동사", "형용사", "부사"]
-
+    @AppStorage("targetLanguage") private var targetLanguage: String = "영어"
+    @AppStorage("targetVoiceStyle") private var targetVoiceStyle: String = "표준"
+    
+    let posOptions = ["표준", "명사", "동사", "형용사", "부사"]
+    
+    @State private var frozenImage: UIImage? = nil
+    @State private var captureAnimationValue: Double = 0.0
+    
     var body: some View {
         ZStack {
-            // 1. 카메라 배경 (CameraManager.shared 사용 유지)
-            CameraPreview(cameraManager: CameraManager.shared)
+            Color.black.ignoresSafeArea()
+            
+            if cameraManager.isAuthorized {
+                
+                // ==========================================
+                // 📸 카메라 영역
+                // ==========================================
+                Group {
+                    if let frozen = frozenImage {
+                        Image(uiImage: frozen)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        CameraPreview(session: cameraManager.session)
+                    }
+                }
                 .ignoresSafeArea()
-
-            VStack {
-                // 2. 🏷️ 품사 선택 상단 UI (추가된 기능)
-                VStack(spacing: 8) {
-                    Text("인식할 품사 카테고리를 선택하세요")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    Picker("품사", selection: $wordVM.selectedPos) {
-                        ForEach(posOptions, id: \.self) { pos in
-                            Text(pos).tag(pos)
-                        }
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                }
-                .padding()
-                .background(BlurView(style: .systemMaterial))
-                .cornerRadius(15)
-                .padding()
-
-                Spacer()
+                .rotation3DEffect(
+                    .degrees(captureAnimationValue * -5),
+                    axis: (x: 1.0, y: 0.0, z: 0.0),
+                    anchor: .center,
+                    perspective: 0.5
+                )
+                .scaleEffect(1.0 - (captureAnimationValue * 0.03))
+                .overlay(
+                    Color.white.opacity(captureAnimationValue > 0.5 ? (1.0 - captureAnimationValue) * 2 : captureAnimationValue * 2).ignoresSafeArea()
+                )
                 
-                // 3. 🎯 실시간 AR 단어 표시 (기존 기능 유지 + 필터링 추가)
-                if let target = networkManager.targetCoordinate {
-                    // 필터링된 단어장(filteredWords)에서 서버 좌표 ID와 맞는 단어 검색
-                    if let wordToShow = wordVM.filteredWords.first(where: { $0.id == target.word_id }) {
-                        VStack {
-                            Text(wordToShow.term) // 단어 표시
-                                .font(.system(size: 45, weight: .black, design: .rounded))
-                                .foregroundColor(.yellow)
-                                .shadow(color: .black, radius: 2)
+                // ==========================================
+                // 🏷️ 품사 필터링 UI
+                // ==========================================
+                VStack {
+                    VStack(spacing: 8) {
+                        Text("인식할 품사 카테고리를 선택하세요")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Picker("품사", selection: $wordVM.selectedPos) {
+                            ForEach(posOptions, id: \.self) { pos in
+                                Text(pos).tag(pos)
+                            }
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                    }
+                    .padding()
+                    .background(BlurView(style: .systemMaterial))
+                    .cornerRadius(15)
+                    .padding()
+                    
+                    Spacer()
+                }
+                
+                // ==========================================
+                // 🎯 AR UI 영역 (햅틱 및 애니메이션 추가됨)
+                // ==========================================
+                Group {
+                    if let coord = arNetworkManager.targetCoordinate,
+                       let matchedWord = arViewModel.discoveredWords.filter({ word in
+                           wordVM.selectedPos == "표준" || word.pos == wordVM.selectedPos
+                       }).first(where: { $0.id.uuidString == coord.word_id }) {
+                        
+                        VStack(spacing: 4) {
+                            Text(matchedWord.word).font(.title).bold()
+                            Text(matchedWord.pronunciation).font(.caption)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(.ultraThinMaterial)
+                        .cornerRadius(20)
+                        .shadow(radius: 5)
+                        // 🌟 새로운 단어마다 고유 ID 부여 -> onAppear가 정확히 한 번만 동작하게 함
+                        .id(matchedWord.id)
+                        .position(x: coord.screenX, y: coord.screenY)
+                        // 🌟 [요구사항 1] 위치 이동을 부드럽게 (기존) & 등장/퇴장 시 스케일+투명도 애니메이션 (추가)
+                        .animation(.interpolatingSpring(stiffness: 100, damping: 15), value: coord.screenX)
+                        .transition(.scale.combined(with: .opacity))
+                        .onAppear {
+                            // 🌟 [요구사항 1] 단어가 처음 AR 화면에 매칭되어 나타날 때 햅틱 진동 발생!
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        }
+                        
+                    } else if !arViewModel.discoveredWords.isEmpty {
+                        
+                        VStack(spacing: 10) {
+                            Text("✅ 분석 완료 (현재 필터: \(wordVM.selectedPos))")
+                                .font(.headline).foregroundColor(.white).padding(.bottom, 5)
                             
-                            Text(wordToShow.meaning) // 뜻 표시
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 10)
-                                .background(Color.black.opacity(0.5))
-                                .cornerRadius(5)
+                            ForEach(arViewModel.discoveredWords.filter { wordVM.selectedPos == "표준" || $0.pos == wordVM.selectedPos }) { word in
+                                HStack {
+                                    Text(word.word).font(.title3).bold()
+                                    Text("(\(word.pronunciation))").foregroundColor(.gray)
+                                    Spacer()
+                                    Text(word.meaning)
+                                }
+                                .padding()
+                                .background(Color.white.opacity(0.9))
+                                .cornerRadius(10)
+                                .foregroundColor(.black)
+                            }
                         }
-                        .position(x: CGFloat(target.screenX), y: CGFloat(target.screenY))
+                        .padding()
+                        .background(Color.black.opacity(0.6))
+                        .cornerRadius(20)
+                        .padding(.horizontal, 30)
+                        .transition(.opacity) // 🌟 리스트 등장 시 부드럽게
                     }
                 }
+                .animation(.easeInOut, value: arViewModel.discoveredWords.isEmpty) // 상태 변경 시 자연스러운 전환
                 
-                Spacer()
-                
-                // 4. 하단 제어 및 분석 버튼 (기존 기능 유지)
-                HStack(spacing: 20) {
-                    // 연결 상태 버튼
-                    Button(action: {
-                        networkManager.isConnected ? networkManager.disconnect() : networkManager.connect()
-                    }) {
-                        Image(systemName: networkManager.isConnected ? "bolt.fill" : "bolt.slash.fill")
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(networkManager.isConnected ? Color.green : Color.gray)
-                            .clipShape(Circle())
+                // ==========================================
+                // 🕹️ 하단 버튼 영역
+                // ==========================================
+                VStack {
+                    if frozenImage != nil && !arViewModel.isAnalyzing {
+                        HStack {
+                            Spacer()
+                            Button(action: resetCamera) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 35))
+                                    .foregroundColor(.white)
+                                    .background(Circle().fill(Color.black.opacity(0.4)))
+                                    .padding(.top, 10).padding(.trailing, 20)
+                            }
+                            .transition(.scale)
+                        }
                     }
                     
-                    // 분석 시작 버튼 (기존 제미나이 분석 기능 유지)
-                    Button(action: {
-                        wordVM.loadWords() // 최신 단어장 갱신
-                    }) {
-                        Text("새로운 환경 분석하기")
-                            .bold()
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                            .background(Color.blue)
+                    Spacer()
+                    
+                    HStack(spacing: 20) {
+                        Button(action: {
+                            arNetworkManager.isConnected ? arNetworkManager.disconnect() : arNetworkManager.connect()
+                        }) {
+                            Image(systemName: arNetworkManager.isConnected ? "bolt.fill" : "bolt.slash.fill")
+                                .foregroundColor(.white).padding().background(arNetworkManager.isConnected ? Color.green : Color.gray).clipShape(Circle())
+                        }
+                        
+                        if frozenImage == nil || arViewModel.isAnalyzing {
+                            Button(action: startAnalysis) {
+                                HStack {
+                                    if arViewModel.isAnalyzing {
+                                        ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        Text(" 제미나이 분석 중...")
+                                    } else {
+                                        Image(systemName: "wand.and.stars")
+                                        Text("이 공간 캡처 및 분석하기")
+                                    }
+                                }
+                                .font(.headline).foregroundColor(.white).padding().frame(maxWidth: .infinity).background(arViewModel.isAnalyzing ? Color.gray : Color.blue).cornerRadius(15)
+                            }
+                            .disabled(arViewModel.isAnalyzing)
+                            .animation(.default, value: arViewModel.isAnalyzing)
+                        }
+                    }
+                    .padding(.horizontal, 30).padding(.bottom, 30)
+                }
+                
+                // 에러 팝업
+                if let error = arViewModel.errorMessage {
+                    VStack {
+                        Text("오류 발생 🚨").bold()
+                        Text(error).multilineTextAlignment(.center)
+                    }
+                    .padding().background(Color.red.opacity(0.8)).foregroundColor(.white).cornerRadius(10)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top).padding(.top, 100)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+                
+                // ==========================================
+                // ⚠️ [요구사항 2] 서버 혼잡 시 대기열 접수 알림 팝업 (미리 준비, 주석 처리됨)
+                // ==========================================
+                /*
+                if arViewModel.showQueuedAlert {
+                    VStack(spacing: 12) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 40))
                             .foregroundColor(.white)
-                            .cornerRadius(12)
+                        Text("서버가 혼잡합니다 ⏱️")
+                            .font(.title3).bold()
+                            .foregroundColor(.white)
+                        Text("이미지를 대기열에 안전하게 저장했습니다.\n분석이 완료되면 푸시 알림으로 알려드릴게요!")
+                            .font(.footnote)
+                            .foregroundColor(.white.opacity(0.9))
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(20)
+                    .background(Color.orange.opacity(0.95))
+                    .cornerRadius(20)
+                    .shadow(radius: 10)
+                    .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height / 2)
+                    .transition(.scale.combined(with: .opacity))
+                    .onAppear {
+                        // 4초 뒤에 알림창이 스르륵 사라지도록 설정
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                            withAnimation {
+                                arViewModel.showQueuedAlert = false
+                            }
+                        }
                     }
                 }
-                .padding(.horizontal, 30)
-                .padding(.bottom, 30)
+                */
+                
+            } else {
+                DeniedCameraView()
             }
         }
         .onAppear {
-            networkManager.connect() // 시작 시 자동 연결
+            cameraManager.checkPermission()
+            arNetworkManager.startSimulation() // 시작 시 자동 연결
         }
         .onDisappear {
-            networkManager.disconnect() // 종료 시 배터리 보호
+            arNetworkManager.disconnect()
         }
+    }
+    
+    // ==========================================
+    // 🌟 핵심 로직: 분석 시작
+    // ==========================================
+    private func startAnalysis() {
+        guard let image = cameraManager.currentFrame else { return }
+        
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        
+        withAnimation(.spring(response: 0.6, dampingFraction: 0.7, blendDuration: 0)) {
+            captureAnimationValue = 1.0
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            frozenImage = image
+            cameraManager.stopSession()
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            captureAnimationValue = 0.0
+        }
+        
+        Task {
+            await arViewModel.analyzeScene(
+                image: image,
+                targetLanguage: targetLanguage,
+                styleOption: targetVoiceStyle,
+                targetPos: wordVM.selectedPos
+            )
+        }
+    }
+    
+    private func resetCamera() {
+        withAnimation {
+            frozenImage = nil
+            arViewModel.discoveredWords.removeAll()
+            arViewModel.errorMessage = nil
+        }
+        cameraManager.startSession()
     }
 }
 
-// 블러 뷰는 별도 구조체로 유지
+// ==========================================
+// 하위 뷰 (블러 뷰 & 권한 거부 화면)
+// ==========================================
 struct BlurView: UIViewRepresentable {
     var style: UIBlurEffect.Style
     func makeUIView(context: Context) -> UIVisualEffectView {
         UIVisualEffectView(effect: UIBlurEffect(style: style))
     }
     func updateUIView(_ uiView: UIVisualEffectView, context: Context) {}
+}
+
+struct DeniedCameraView: View {
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "camera.slash").font(.system(size: 60)).foregroundColor(.gray)
+            Text("AR 단어 인식을 위해\n카메라 권한이 꼭 필요해요 🥺")
+                .font(.headline).foregroundColor(.white).multilineTextAlignment(.center)
+            Button(action: {
+                if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(settingsURL)
+                }
+            }) {
+                Text("설정 열기").font(.headline).foregroundColor(.white).padding().frame(width: 150).background(Color.blue).cornerRadius(10)
+            }
+        }.frame(maxWidth: .infinity, maxHeight: .infinity).background(Color.black.opacity(0.9)).ignoresSafeArea()
+    }
 }

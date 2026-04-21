@@ -18,6 +18,8 @@ class QuizViewModel: ObservableObject {
     
     private let model: GenerativeModel
     
+    @Published var targetLanguage: String = "일본어"
+    
     init() {
         let apiKey = Bundle.main.geminiApiKey // 기존에 만들어둔 extension 활용
         // [Constants 적용] 모델 이름

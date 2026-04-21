@@ -1,13 +1,6 @@
-//
-//  QuizView.swift
-//  LearningUI
-//
-//  Refactored for UI Componentization with State Machine
-//
-
 import SwiftUI
 
-// MARK: - [1] 메인 화면 (조립 설명서)
+// MARK: - [1] 메인 화면
 struct QuizView: View {
     @EnvironmentObject var wordViewModel: WordViewModel
     @ObservedObject var quizViewModel: QuizViewModel
@@ -20,15 +13,13 @@ struct QuizView: View {
     // 단어 추가용 상태
     @State private var newQuizTerm = ""
     @State private var newQuizMeaning = ""
-    @State private var isSavingWord = false // 🌟 [추가] 단어 저장 중인지 확인하는 로컬 상태
+    @State private var isSavingWord = false
     
     var body: some View {
         VStack {
-            // 깔끔한 switch 문으로 상태 관리
             switch quizViewModel.state {
                 
             case .idle:
-                // [상황 1] 대기 화면 (에러 없음)
                 QuizEmptyView(
                     errorMessage: nil,
                     isWordEmpty: wordViewModel.words.isEmpty,
@@ -36,27 +27,20 @@ struct QuizView: View {
                 )
                 
             case .loading:
-                // [상황 2] 로딩 중
-                ProgressView(Constants.Labels.loading)
+                ProgressView("퀴즈를 준비하고 있습니다...")
                     .controlSize(.large)
                 
             case .success(let quiz):
-                // [상황 3] 퀴즈 도착 (메인 게임 화면)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         
-                        // 1. 듣기 버튼 블록
                         QuizAudioButton(text: quiz.passage)
-                        
-                        // 2. 지문 박스 블록
                         QuizPassageView(text: quiz.passage)
                         
-                        // 3. 질문 텍스트
                         Text("\(Constants.Labels.questionPrefix) \(quiz.question)")
                             .font(.headline)
                             .padding(.top, 10)
                         
-                        // 4. 보기 버튼들
                         ForEach(quiz.options.indices, id: \.self) { index in
                             QuizOptionButton(
                                 index: index,
@@ -67,9 +51,10 @@ struct QuizView: View {
                             )
                         }
                         
-                        // 5. 다음 문제 버튼
                         if showResult {
                             Button(Constants.Labels.nextQuiz) {
+                                // 🌟 [4번 최적화] 다음 문제 버튼을 누를 때 가벼운 진동
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                 requestNewQuiz()
                             }
                             .buttonStyle(.borderedProminent)
@@ -79,9 +64,15 @@ struct QuizView: View {
                     }
                     .padding()
                 }
+                // 🌟 [2번 최적화] SwiftUI에게 '새로운 문제'임을 각인시켜 부드러운 애니메이션 유도
+                .id(quiz.question) 
+                .transition(.asymmetric(
+                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                    removal: .move(edge: .leading).combined(with: .opacity)
+                ))
+                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: quiz.question)
                 
             case .failure(let errorMessage):
-                // [상황 4] 에러 발생 화면
                 QuizEmptyView(
                     errorMessage: errorMessage,
                     isWordEmpty: wordViewModel.words.isEmpty,
@@ -89,7 +80,7 @@ struct QuizView: View {
                 )
             }
         }
-        .navigationTitle(Constants.Labels.quizTitle)
+        .navigationTitle(quizViewModel.targetLanguage + " 퀴즈") // 다국어 제목 동적 적용
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(action: { showAddSheet = true }) {
@@ -98,7 +89,6 @@ struct QuizView: View {
                 }
             }
         }
-        // 단어 추가 시트 (Sheet)
         .sheet(isPresented: $showAddSheet) {
             addWordSheet
         }
@@ -106,8 +96,11 @@ struct QuizView: View {
     
     // 로직: 다음 퀴즈 요청
     func requestNewQuiz() {
-        selectedOption = nil
-        showResult = false
+        // 문제 전환 시 기존 선택 상태 초기화
+        withAnimation {
+            selectedOption = nil
+            showResult = false
+        }
         Task {
             await quizViewModel.makeQuiz(from: wordViewModel.words)
         }
@@ -134,9 +127,9 @@ struct QuizView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(action: {
                         Task {
-                            isSavingWord = true // 🌟 버튼 누르면 로딩 시작!
+                            isSavingWord = true
                             let success = await wordViewModel.addWord(term: newQuizTerm, meaning: newQuizMeaning)
-                            isSavingWord = false // 🌟 통신 끝나면 로딩 끝!
+                            isSavingWord = false
                             
                             if success {
                                 showAddSheet = false
@@ -145,14 +138,12 @@ struct QuizView: View {
                             }
                         }
                     }) {
-                        // 🌟 통신 중이면 뱅글뱅글 애니메이션, 아니면 "저장" 글자 표시
                         if isSavingWord {
                             ProgressView()
                         } else {
                             Text(Constants.Labels.save)
                         }
                     }
-                    // 🌟 빈칸이거나 통신 중일 때는 버튼 꾹 막아두기
                     .disabled(newQuizTerm.trimmingCharacters(in: .whitespaces).isEmpty ||
                               newQuizMeaning.trimmingCharacters(in: .whitespaces).isEmpty ||
                               isSavingWord)
@@ -176,16 +167,22 @@ struct QuizOptionButton: View {
     
     var body: some View {
         Button(action: {
-            selectedOption = index
-            showResult = true
+            // 🌟 [4번 최적화] 즉각적인 햅틱 피드백 (손맛!)
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            
+            // 🌟 정답/오답 결과가 딱딱하게 바뀌지 않고 스르륵 부드럽게 나타나게 함
+            withAnimation(.easeInOut(duration: 0.2)) {
+                selectedOption = index
+                showResult = true
+            }
         }) {
             HStack {
                 Text("\(index + 1). \(optionText)")
                     .font(.body)
-                    .foregroundStyle(.primary).textSelection(.enabled)
+                    .foregroundStyle(.primary)
+                    .textSelection(.enabled)
                 Spacer()
                 
-                // 정답/오답 아이콘 표시 로직
                 if showResult {
                     if index == answerIndex {
                         Image(systemName: Constants.Icons.check).foregroundStyle(.green)
@@ -199,17 +196,31 @@ struct QuizOptionButton: View {
                 RoundedRectangle(cornerRadius: 10)
                     .stroke(borderColor, lineWidth: 1.5)
             )
+            // 선택된 정답의 배경색을 살짝 깔아주어 입체감을 더함
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(backgroundColor)
+            )
         }
         .disabled(showResult)
     }
     
-    // 테두리 색상 계산 로직
+    // 테두리 색상 계산
     var borderColor: Color {
-        if selectedOption == index {
-            return .blue
-        } else {
-            return .gray.opacity(0.3)
+        if showResult {
+            if index == answerIndex { return .green } // 정답은 무조건 초록
+            if index == selectedOption { return .red } // 내가 고른 오답은 빨강
         }
+        return selectedOption == index ? .blue : .gray.opacity(0.3)
+    }
+    
+    // 배경 색상 계산 (UI 디테일 향상)
+    var backgroundColor: Color {
+        if showResult {
+            if index == answerIndex { return .green.opacity(0.1) }
+            if index == selectedOption { return .red.opacity(0.1) }
+        }
+        return .clear
     }
 }
 
@@ -221,6 +232,7 @@ struct QuizAudioButton: View {
         HStack {
             Spacer()
             Button(action: {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 SpeechManager.shared.speak(text: text)
             }) {
                 HStack(spacing: 5) {
@@ -254,11 +266,12 @@ struct QuizPassageView: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-            ).textSelection(.enabled)
+            )
+            .textSelection(.enabled)
     }
 }
 
-// 🧱 블록 4: 빈 화면 (에러 화면)
+// 🧱 블록 4: 빈 화면 (대기/에러 화면)
 struct QuizEmptyView: View {
     let errorMessage: String?
     let isWordEmpty: Bool
@@ -285,6 +298,7 @@ struct QuizEmptyView: View {
             }
             
             Button(Constants.Labels.startQuiz) {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 onStart()
             }
             .buttonStyle(.borderedProminent)

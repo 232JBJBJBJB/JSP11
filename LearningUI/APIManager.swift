@@ -4,7 +4,7 @@ class APIManager {
     static let shared = APIManager()
     
     // 💡 집 와이파이 주소로 업데이트됨!
-    private let baseURL = "http://192.168.219.102:8080/api"
+    private let baseURL = "http://13.209.8.196:8080/api"
     
     private init() {}
     

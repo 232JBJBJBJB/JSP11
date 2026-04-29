@@ -10,6 +10,8 @@
 		4708B23F2F7F4BB900936F49 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 4708B2342F7F4BB900936F49 /* .gitignore */; };
 		4737EAF12F626EB9007AAA72 /* GoogleGenerativeAI in Frameworks */ = {isa = PBXBuildFile; productRef = 4737EAF02F626EB9007AAA72 /* GoogleGenerativeAI */; };
 		4746E0C32F876A7100F20F89 /* opencv2.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4746E0C22F876A7100F20F89 /* opencv2.framework */; };
+		4750FBF62FA1A07A004AE1AE /* WordComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4750FBF52FA1A07A004AE1AE /* WordComponents.swift */; };
+		4750FBF82FA1A08E004AE1AE /* WordDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4750FBF72FA1A08E004AE1AE /* WordDetailView.swift */; };
 		4754F6A22F875B4A00A9E26E /* ARBubbleRenderer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4754F6A02F875B4A00A9E26E /* ARBubbleRenderer.cpp */; };
 		4754F6A32F875B4A00A9E26E /* ARBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4754F69E2F875B4A00A9E26E /* ARBridge.mm */; };
 		4764D6882F461B060046B5A5 /* QuizView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4764D66C2F3DC4050046B5A5 /* QuizView.swift */; };
@@ -58,6 +60,8 @@
 		470C204C2F49A417004337BF /* LearningUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LearningUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4718C5872F3594E20041E7E9 /* LearningUI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LearningUI.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4746E0C22F876A7100F20F89 /* opencv2.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = opencv2.framework; sourceTree = "<group>"; };
+		4750FBF52FA1A07A004AE1AE /* WordComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WordComponents.swift; sourceTree = "<group>"; };
+		4750FBF72FA1A08E004AE1AE /* WordDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WordDetailView.swift; sourceTree = "<group>"; };
 		4754F69D2F875B4A00A9E26E /* ARBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARBridge.h; sourceTree = "<group>"; };
 		4754F69E2F875B4A00A9E26E /* ARBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ARBridge.mm; sourceTree = "<group>"; };
 		4754F69F2F875B4A00A9E26E /* ARBubbleRenderer.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ARBubbleRenderer.hpp; sourceTree = "<group>"; };
@@ -186,6 +190,8 @@
 			isa = PBXGroup;
 			children = (
 				4764D6522F3AFBF90046B5A5 /* Word.swift */,
+				4750FBF52FA1A07A004AE1AE /* WordComponents.swift */,
+				4750FBF72FA1A08E004AE1AE /* WordDetailView.swift */,
 				4764D6502F3AFBCE0046B5A5 /* WordViewModel.swift */,
 			);
 			path = Word;
@@ -351,6 +357,7 @@
 				4764D6882F461B060046B5A5 /* QuizView.swift in Sources */,
 				4778A4D62F63FB6B0097CCB1 /* CameraPreview.swift in Sources */,
 				4764D6892F461B060046B5A5 /* QuizViewModel.swift in Sources */,
+				4750FBF62FA1A07A004AE1AE /* WordComponents.swift in Sources */,
 				4764D68A2F461B060046B5A5 /* Word.swift in Sources */,
 				4764D68B2F461B060046B5A5 /* WordViewModel.swift in Sources */,
 				4778A4BB2F62A4F70097CCB1 /* Bundle+Extension.swift in Sources */,
@@ -358,6 +365,7 @@
 				47C3C1E92F74010C00503C09 /* ARNetworkManager.swift in Sources */,
 				4754F6A22F875B4A00A9E26E /* ARBubbleRenderer.cpp in Sources */,
 				4754F6A32F875B4A00A9E26E /* ARBridge.mm in Sources */,
+				4750FBF82FA1A08E004AE1AE /* WordDetailView.swift in Sources */,
 				4778A4BC2F62A4F70097CCB1 /* Constants.swift in Sources */,
 				4778A4D72F63FC160097CCB1 /* MainCameraView.swift in Sources */,
 			);

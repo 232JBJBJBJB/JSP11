@@ -2,34 +2,46 @@ import Foundation
 import SwiftUI
 import Combine
 
+// ==========================================
+// 1. 데이터 모델 (제미나이가 줄 JSON 형태)
+// ==========================================
 struct ARWord: Codable, Identifiable {
     var id = UUID() // SwiftUI 리스트나 반복문(ForEach)에서 쓰기 위한 고유 ID
     let word: String
     let pronunciation: String
     let meaning: String
-    let pos: String
+    var pos: String? // 🌟 조원의 품사 필터링을 위한 변수
     
-    // 🌟 [3주차 대비] C++ 비전 엔진 조원이 넘겨줄 정밀 좌표값을 담을 그릇 (옵셔널)
+    // 🌟 제미나이(혹은 C++ 엔진)가 줄 수도 있으니 옵셔널 처리 (좌표)
     var relativeX: Double?
     var relativeY: Double?
     
-    // JSON 통신할 때는 id, relativeX, relativeY는 빼고 기본 데이터 4개만 받도록 설정
+    // JSON 통신할 때 좌표값도 받으려면 CodingKeys에 꼭 추가해 줘야 해!
     enum CodingKeys: String, CodingKey {
         case word
         case pronunciation
         case meaning
         case pos
+        case relativeX
+        case relativeY
     }
 }
+
 // ==========================================
 // ARViewModel - AIManager 연동 버전
-// GenerativeModel 직접 호출 → AIManager.shared 로 교체
 // ==========================================
 @MainActor
 class ARViewModel: ObservableObject {
     @Published var discoveredWords: [ARWord] = []
     @Published var isAnalyzing = false
     @Published var errorMessage: String? = nil
+    
+    // ⚠️ [요구사항 2] 대기열 팝업 상태 변수 (현재는 백엔드 미완성으로 주석 처리)
+    /*
+    @Published var showQueuedAlert = false
+    */
+    
+    // (GenerativeModel 직접 선언하던 부분은 AIManager로 통합했으니 삭제!)
     
     // ==========================================
     // 3. 제미나이 분석 실행 함수 (AIManager 연동)
@@ -39,12 +51,23 @@ class ARViewModel: ObservableObject {
         self.errorMessage = nil
         self.discoveredWords.removeAll()
         
-        // 이미지 최적화 (전송 속도 향상 + 429 방어)
+        // 🌟 [최적화 1] 이미지 다이어트
         guard let optimizedImage = resizeImage(image: image, targetWidth: 800) else {
             self.errorMessage = "이미지 최적화에 실패했습니다."
             self.isAnalyzing = false
             return
         }
+        
+        // ⚠️ [요구사항 2] 나중에 백엔드 API를 연동할 때 202 응답 처리 로직 뼈대 (주석 처리)
+        /*
+        // 추후 직접 서버(Spring Boot)로 통신할 때 아래와 같이 사용하세요.
+        // let response = try await APIManager.shared.queueImageForLater(...)
+        // if response.statusCode == 202 {
+        //     DispatchQueue.main.async {
+        //         self.showQueuedAlert = true
+        //     }
+        // }
+        */
         
         let posInstruction = targetPos == "표준"
             ? "화면에 보이는 가장 눈에 띄는 사물이나 특징(명사, 형용사 등)을"
@@ -60,7 +83,8 @@ class ARViewModel: ObservableObject {
         [중요 규칙]
         1. 사진을 분석해서 \(posInstruction) 추출해.
         2. 반드시 한국어 뜻(meaning)은 명확하게 1~2개 단어로만 적어.
-        3. 응답은 무조건 아래 JSON 형식으로만 줘. 마크다운이나 다른 설명은 절대 넣지 마.
+        3. 🌟 해당 사물이 사진의 어느 위치에 있는지 중심 좌표를 가로 비율(relativeX, 0.0 왼쪽 ~ 1.0 오른쪽)과 세로 비율(relativeY, 0.0 상단 ~ 1.0 하단)로 반드시 계산해서 소수점으로 포함해.
+        4. 응답은 무조건 아래 JSON 형식으로만 줘. 마크다운(` ```json `)이나 다른 설명은 절대 넣지 마.
         
         [출력 예시]
         [
@@ -68,20 +92,20 @@ class ARViewModel: ObservableObject {
                 "word": "현지 언어 단어",
                 "pronunciation": "발음 기호",
                 "meaning": "한국어 뜻",
-                "pos": "\(targetPos == "표준" ? "명사" : targetPos)"
+                "pos": "\(targetPos == "표준" ? "명사" : targetPos)",
+                "relativeX": 0.5,
+                "relativeY": 0.4
             }
         ]
         """
         
         do {
-            // 🌟 핵심 변경: model.generateContent() → AIManager.shared.generateTextFromImage()
-            // Gemini 실패 시 자동으로 GPT-4o로 폴백됨
+            // 🌟 핵심 변경: AIManager.shared.generateTextFromImage() 사용 (GPT-4o 폴백 포함)
             let resultText = try await AIManager.shared.generateTextFromImage(
                 prompt: prompt,
                 image: optimizedImage
             )
             
-            // 어떤 AI가 응답했는지 로그
             let provider = AIManager.shared.lastUsedProvider == .gemini ? "Gemini" : "GPT-4o (폴백)"
             print("🤖 [\(provider)] AR 분석 원본 대답:\n\(resultText)")
             
@@ -98,7 +122,12 @@ class ARViewModel: ObservableObject {
             }
             
             let decodedWords = try JSONDecoder().decode([ARWord].self, from: data)
-            self.discoveredWords = decodedWords
+            
+            // 🌟 UI 업데이트 (애니메이션 및 햅틱 반응)
+            withAnimation {
+                self.discoveredWords = decodedWords
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
             
         } catch {
             print("❌ AR 분석 에러: \(error.localizedDescription)")

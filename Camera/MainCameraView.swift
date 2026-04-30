@@ -1,22 +1,17 @@
 import SwiftUI
 
 struct MainCameraView: View {
-    // 🌟 1. 앱의 3대장 완벽 고용!
-    @StateObject private var cameraManager = CameraManager.shared // 아까 싱글톤으로 맞춘 거 기억나지?
+    // 🌟 1. 앱의 3대장 고용!
+    @StateObject private var cameraManager = CameraManager.shared
     @StateObject private var arViewModel = ARViewModel()
     @StateObject private var arNetworkManager = ARNetworkManager()
-    
-    // 🌟 2. 품사 전용 뷰모델 고용 (조원 아이디어)
     @StateObject private var wordVM = WordViewModel()
     
-    // 환경 설정 데이터 (targetVoiceStyle 유지!)
     @AppStorage("targetLanguage") private var targetLanguage: String = "영어"
     @AppStorage("targetVoiceStyle") private var targetVoiceStyle: String = "표준"
     
-    // 품사 옵션 정의
     let posOptions = ["표준", "명사", "동사", "형용사", "부사"]
     
-    // 🌟 3. 화면 멈춤 및 3D 애니메이션용 변수
     @State private var frozenImage: UIImage? = nil
     @State private var captureAnimationValue: Double = 0.0
     
@@ -27,7 +22,7 @@ struct MainCameraView: View {
             if cameraManager.isAuthorized {
                 
                 // ==========================================
-                // 📸 카메라 영역 (라이브 vs 멈춘 화면)
+                // 📸 카메라 영역
                 // ==========================================
                 Group {
                     if let frozen = frozenImage {
@@ -35,13 +30,10 @@ struct MainCameraView: View {
                             .resizable()
                             .scaledToFill()
                     } else {
-                        // 🌟 아까 고친 session 파이프라인 연결!
                         CameraPreview(session: cameraManager.session)
                     }
                 }
                 .ignoresSafeArea()
-                
-                // 🌟 3D 찰칵 모션 및 하얀 섬광 연출
                 .rotation3DEffect(
                     .degrees(captureAnimationValue * -5),
                     axis: (x: 1.0, y: 0.0, z: 0.0),
@@ -54,7 +46,7 @@ struct MainCameraView: View {
                 )
                 
                 // ==========================================
-                // 🏷️ 품사 필터링 UI (조원 아이디어 이식)
+                // 🏷️ 품사 필터링 UI
                 // ==========================================
                 VStack {
                     VStack(spacing: 8) {
@@ -78,57 +70,55 @@ struct MainCameraView: View {
                 }
                 
                 // ==========================================
-                // 🎯 AR UI 영역 (제미나이 결과 + 품사 필터링)
+                // 🎯 AR UI 영역 (정지된 화면 위에 다중 말풍선 띄우기!)
                 // ==========================================
                 Group {
-                    if let coord = arNetworkManager.targetCoordinate,
-                       let matchedWord = arViewModel.discoveredWords.filter({ word in
-                           wordVM.selectedPos == "표준" || word.pos == wordVM.selectedPos
-                       }).first(where: { $0.id.uuidString == coord.word_id }) {
-                        
-                        VStack(spacing: 4) {
-                            Text(matchedWord.word).font(.title).bold()
-                            Text(matchedWord.pronunciation).font(.caption)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(20)
-                        .shadow(radius: 5)
-                        .position(x: coord.screenX, y: coord.screenY)
-                        .animation(.linear(duration: 0.1), value: coord.screenX)
-                        
-                    } else if !arViewModel.discoveredWords.isEmpty {
-                        
-                        VStack(spacing: 10) {
-                            Text("✅ 분석 완료 (현재 필터: \(wordVM.selectedPos))")
-                                .font(.headline).foregroundColor(.white).padding(.bottom, 5)
+                    if let frozen = frozenImage, !arViewModel.discoveredWords.isEmpty {
+                        ZStack {
+                            // 🌟 화면 크기와 사진 크기 구하기
+                            let screenSize = UIScreen.main.bounds.size
+                            let imageSize = frozen.size
                             
+                            // 🌟 선택된 품사에 맞는 단어들만 화면에 그리기
                             ForEach(arViewModel.discoveredWords.filter { wordVM.selectedPos == "표준" || $0.pos == wordVM.selectedPos }) { word in
-                                HStack {
-                                    Text(word.word).font(.title3).bold()
-                                    Text("(\(word.pronunciation))").foregroundColor(.gray)
-                                    Spacer()
-                                    Text(word.meaning)
+                                
+                                // 제미나이가 좌표를 정상적으로 줬을 때만 버블 생성
+                                if let rx = word.relativeX, let ry = word.relativeY {
+                                    
+                                    // 🌟 마법의 번역기로 진짜 아이폰 좌표 계산!
+                                    let realPoint = convertToScreenCoordinate(
+                                        relativeX: rx,
+                                        relativeY: ry,
+                                        imageSize: imageSize,
+                                        screenSize: screenSize
+                                    )
+                                    
+                                    VStack(spacing: 4) {
+                                        Text(word.word).font(.title).bold()
+                                        Text(word.pronunciation).font(.caption)
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
+                                    .background(.ultraThinMaterial)
+                                    .cornerRadius(20)
+                                    .shadow(radius: 5)
+                                    .position(x: realPoint.x, y: realPoint.y) // 계산된 진짜 좌표 적용
+                                    .transition(.scale.combined(with: .opacity))
+                                    .onAppear {
+                                        // 🌟 단어가 뿅! 나타날 때 기분 좋은 햅틱 진동
+                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    }
                                 }
-                                .padding()
-                                .background(Color.white.opacity(0.9))
-                                .cornerRadius(10)
-                                .foregroundColor(.black)
                             }
                         }
-                        .padding()
-                        .background(Color.black.opacity(0.6))
-                        .cornerRadius(20)
-                        .padding(.horizontal, 30)
                     }
                 }
+                .animation(.easeInOut, value: arViewModel.discoveredWords.isEmpty)
                 
                 // ==========================================
                 // 🕹️ 하단 버튼 영역
                 // ==========================================
                 VStack {
-                    // 상단 X 버튼 (다시 찍기)
                     if frozenImage != nil && !arViewModel.isAnalyzing {
                         HStack {
                             Spacer()
@@ -139,13 +129,13 @@ struct MainCameraView: View {
                                     .background(Circle().fill(Color.black.opacity(0.4)))
                                     .padding(.top, 10).padding(.trailing, 20)
                             }
+                            .transition(.scale)
                         }
                     }
                     
                     Spacer()
                     
                     HStack(spacing: 20) {
-                        // 서버 연결 상태 버튼
                         Button(action: {
                             arNetworkManager.isConnected ? arNetworkManager.disconnect() : arNetworkManager.connect()
                         }) {
@@ -153,7 +143,6 @@ struct MainCameraView: View {
                                 .foregroundColor(.white).padding().background(arNetworkManager.isConnected ? Color.green : Color.gray).clipShape(Circle())
                         }
                         
-                        // 제미나이 분석 버튼
                         if frozenImage == nil || arViewModel.isAnalyzing {
                             Button(action: startAnalysis) {
                                 HStack {
@@ -168,12 +157,15 @@ struct MainCameraView: View {
                                 .font(.headline).foregroundColor(.white).padding().frame(maxWidth: .infinity).background(arViewModel.isAnalyzing ? Color.gray : Color.blue).cornerRadius(15)
                             }
                             .disabled(arViewModel.isAnalyzing)
+                            .animation(.default, value: arViewModel.isAnalyzing)
                         }
                     }
                     .padding(.horizontal, 30).padding(.bottom, 30)
                 }
                 
-                // 에러 팝업
+                // ==========================================
+                // 🚨 에러 팝업
+                // ==========================================
                 if let error = arViewModel.errorMessage {
                     VStack {
                         Text("오류 발생 🚨").bold()
@@ -181,7 +173,13 @@ struct MainCameraView: View {
                     }
                     .padding().background(Color.red.opacity(0.8)).foregroundColor(.white).cornerRadius(10)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top).padding(.top, 100)
+                    .transition(.move(edge: .top).combined(with: .opacity))
                 }
+                
+                // 대기열 팝업 주석 처리 (유지)
+                /*
+                if arViewModel.showQueuedAlert { ... }
+                */
                 
             } else {
                 DeniedCameraView()
@@ -197,18 +195,19 @@ struct MainCameraView: View {
     }
     
     // ==========================================
-    // 🌟 핵심 로직: 분석 시작 (3D 모션 + 하드웨어 제어 + 품사 프롬프트)
+    // 🌟 핵심 로직: 분석 시작
     // ==========================================
     private func startAnalysis() {
         guard let image = cameraManager.currentFrame else { return }
         
+        // 카메라 셔터 누르는 듯한 햅틱 진동
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         
+        // 찰칵! 하는 플래시 애니메이션
         withAnimation(.spring(response: 0.6, dampingFraction: 0.7, blendDuration: 0)) {
             captureAnimationValue = 1.0
         }
         
-        // 0.3초 뒤 화면 고정 및 배터리 절약(stopSession)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             frozenImage = image
             cameraManager.stopSession()
@@ -218,7 +217,7 @@ struct MainCameraView: View {
             captureAnimationValue = 0.0
         }
         
-        // 🌟 제미나이 호출 (언어 + 방언 + 조원이 선택한 품사까지 완벽 전달!)
+        // 제미나이에게 사진과 프롬프트 전송
         Task {
             await arViewModel.analyzeScene(
                 image: image,
@@ -229,11 +228,43 @@ struct MainCameraView: View {
         }
     }
     
-    // 카메라 초기화
+    // ==========================================
+    // 🌟 마법의 좌표 번역기 (비율 좌표 -> 아이폰 화면 좌표)
+    // ==========================================
+    func convertToScreenCoordinate(relativeX: Double, relativeY: Double, imageSize: CGSize, screenSize: CGSize) -> CGPoint {
+        let imageAspect = imageSize.width / imageSize.height
+        let screenAspect = screenSize.width / screenSize.height
+        
+        var scaleFactor: CGFloat = 1.0
+        var offsetX: CGFloat = 0.0
+        var offsetY: CGFloat = 0.0
+        
+        // .scaledToFill 모드일 때의 오차 계산 로직
+        if screenAspect > imageAspect {
+            // 화면이 가로로 더 길 때 (위아래가 잘려나감)
+            scaleFactor = screenSize.width / imageSize.width
+            let scaledHeight = imageSize.height * scaleFactor
+            offsetY = (scaledHeight - screenSize.height) / 2.0
+        } else {
+            // 화면이 세로로 더 길 때 (양옆이 잘려나감 - 아이폰 세로 모드는 보통 이럼!)
+            scaleFactor = screenSize.height / imageSize.height
+            let scaledWidth = imageSize.width * scaleFactor
+            offsetX = (scaledWidth - screenSize.width) / 2.0
+        }
+        
+        // 제미나이가 준 상대 좌표를 스케일에 맞게 불리고, 잘려나간(Offset) 만큼 빼주기!
+        let finalX = (CGFloat(relativeX) * imageSize.width * scaleFactor) - offsetX
+        let finalY = (CGFloat(relativeY) * imageSize.height * scaleFactor) - offsetY
+        
+        return CGPoint(x: finalX, y: finalY)
+    }
+    
     private func resetCamera() {
-        frozenImage = nil
-        arViewModel.discoveredWords.removeAll()
-        arViewModel.errorMessage = nil
+        withAnimation {
+            frozenImage = nil
+            arViewModel.discoveredWords.removeAll()
+            arViewModel.errorMessage = nil
+        }
         cameraManager.startSession()
     }
 }

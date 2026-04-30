@@ -105,10 +105,13 @@ void ARBubbleRenderer::RenderEnhanced(cv::Mat& frame, bool applyBlur, float upsc
     int screenWidth = frame.cols;
     int screenHeight = frame.rows;
 
-    // 2. 배경 블러 처리
-    if (applyBlur && !currentWords.empty()) {
-        cv::Mat blurredFrame;
-        cv::GaussianBlur(frame, blurredFrame, cv::Size(25, 25), 0);
+   // 2. 초고속 흑백 포커싱 필터 적용 (블러 제거로 연산량 최소화)
+    if (applyBlur && !currentWords.empty()) { // (변수명 applyBlur는 밖에서 통제하므로 그대로 둡니다)
+        cv::Mat grayBackground;
+
+        // 1. 전체 화면 흑백 변환 (연산량 매우 적음)
+        cv::cvtColor(frame, grayBackground, cv::COLOR_BGR2GRAY);
+        cv::cvtColor(grayBackground, grayBackground, cv::COLOR_GRAY2BGR); // 사본과 채널 수를 맞춤
 
         cv::Mat mask = cv::Mat::zeros(frame.size(), CV_8UC1);
 
@@ -122,10 +125,9 @@ void ARBubbleRenderer::RenderEnhanced(cv::Mat& frame, bool applyBlur, float upsc
             cv::rectangle(mask, objectRect, cv::Scalar(255), cv::FILLED);
         }
 
-        cv::Mat result;
-        blurredFrame.copyTo(result);
-        frame.copyTo(result, mask);
-        frame = result;
+        // 2. 무거운 블러 합성 대신, 흑백 배경 위에 원본 컬러 사물만 바로 덮어쓰기
+        frame.copyTo(grayBackground, mask);
+        frame = grayBackground;
     }
 
     // 3. 기존 말풍선 렌더링

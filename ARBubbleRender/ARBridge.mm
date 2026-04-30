@@ -38,3 +38,29 @@ UIImage* C_RenderBubblesOnImage(UIImage* inputImage) {
     
     return resultImage;
 }
+
+void C_UpdateARWords_V2(const char* word, const char* pron, const char* meaning, 
+                        float relX, float relY, 
+                        float xmin, float ymin, float xmax, float ymax) {
+    ARWordData data;
+    data.word = word ? word : "";
+    data.pronunciation = pron ? pron : "";
+    data.meaning = meaning ? meaning : "";
+    data.relativeX = relX;
+    data.relativeY = relY;
+    data.xmin = xmin; data.ymin = ymin; data.xmax = xmax; data.ymax = ymax;
+    
+    tempWords.push_back(data);
+    renderer.UpdateWords(tempWords);
+}
+
+UIImage* C_RenderEnhancedBubbles(UIImage* inputImage, bool applyBlur, float upscaleFactor) {
+    if (!inputImage) return nil;
+    cv::Mat frame;
+    UIImageToMat(inputImage, frame);
+
+    // 향상된 렌더러 호출
+    renderer.RenderEnhanced(frame, applyBlur, upscaleFactor);
+
+    return MatToUIImage(frame);
+}

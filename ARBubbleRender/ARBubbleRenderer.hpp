@@ -9,6 +9,7 @@ struct ARWordData {
     std::string word;
     std::string pronunciation;
     std::string meaning;
+    float xmin, ymin, xmax, ymax;
     float relativeX;
     float relativeY;
 };
@@ -29,6 +30,7 @@ public:
     void UpdateWords(const std::vector<ARWordData>& words);
 
     void Render(cv::Mat& frame);
+    void RenderEnhanced(cv::Mat& frame, bool applyBlur, float upscaleFactor);
 };
 
 #endif /* ARBubbleRenderer_hpp */

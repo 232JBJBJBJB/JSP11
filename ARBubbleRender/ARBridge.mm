@@ -1,6 +1,5 @@
 #import "ARBridge.h"
 #import "ARBubbleRenderer.hpp"
-#import <opencv2/opencv.hpp>
 #import <opencv2/imgcodecs/ios.h> // iOS 전용 OpenCV 컨버터
 
 static ARBubbleRenderer renderer;

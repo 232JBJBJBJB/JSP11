@@ -3,89 +3,165 @@ import SwiftUI
 import Combine
 import GoogleGenerativeAI
 
-// 🌟 신호등 역할을 할 Enum(상태 기계) 생성
+// MARK: - Quiz State
+
 enum QuizState {
-    case idle // 퀴즈 출제 대기 중
-    case loading // AI가 퀴즈 만드는 중 (로딩)
-    case success(GeneratedQuiz) // 퀴즈 생성 성공! (데이터 포함)
-    case failure(String) // 에러 발생 (에러 메시지 포함)
+    case idle
+    case loading
+    case success(GeneratedQuiz)
+    case failure(String)
 }
+
+
+// MARK: - QuizViewModel
 
 @MainActor
 class QuizViewModel: ObservableObject {
-    // 🌟 변수들을 'state' 하나로 통합! (처음엔 대기 상태로 시작)
     @Published var state: QuizState = .idle
-    
+    @Published var targetLanguage: String = "중국어"
+
     private let model: GenerativeModel
     
+    // 사전 로딩된 퀴즈 창고
+    private var preloadedQuiz: GeneratedQuiz? = nil
+    private var isPreloading: Bool = false
+
+    private let quizStyles = [
+        "A와 B의 자연스러운 대화 (Dialogue)",
+        "짧은 에세이 또는 일기 (Essay)",
+        "스마트폰 설정 화면 또는 앱 알림 메시지 (Mobile UI)",
+        "공공장소 안내문 또는 사용 설명서 (Notice)"
+    ]
+
     init() {
-        let apiKey = Bundle.main.geminiApiKey // 기존에 만들어둔 extension 활용
-        // [Constants 적용] 모델 이름
+        let apiKey = Bundle.main.geminiApiKey
         self.model = GenerativeModel(name: Constants.Config.modelName, apiKey: apiKey)
     }
-    
-    // 🌟 파라미터로 통합된 모델인 [Word]를 받음! (AWS에서 가져온 데이터)
+
+    // MARK: - Public: 퀴즈 요청 (버튼 클릭 시)
+
     func makeQuiz(from savedWords: [Word]) async {
-        // 로딩 시작!
-        state = .loading
-        
-        // 1. 🎲 50:50 동전 던지기! (단어장이 비어있으면 강제로 '새 단어 모드')
-        let isReviewMode = savedWords.isEmpty ? false : Bool.random()
-        
-        // 2. 모드에 따른 AI 지시사항(프롬프트) 작성
+        // ✅ 창고에 미리 만들어둔 퀴즈가 있다면 즉시 반환
+        if let readyQuiz = preloadedQuiz {
+            self.state = .success(readyQuiz)
+            self.preloadedQuiz = nil
+
+            // 사용자가 문제를 푸는 동안 다음 문제 백그라운드 생성
+            Task { await preloadNextQuiz(from: savedWords) }
+            return
+        }
+
+        self.state = .loading
+        await fetchQuizFromAI(from: savedWords, isPreload: false)
+    }
+
+    // MARK: - Private: 백그라운드 사전 퀴즈 생성
+
+    private func preloadNextQuiz(from savedWords: [Word]) async {
+        guard !isPreloading else { return }
+        isPreloading = true
+        await fetchQuizFromAI(from: savedWords, isPreload: true)
+        isPreloading = false
+    }
+
+    // MARK: - Private: AI 통신 + 최적화 로직
+
+    private func fetchQuizFromAI(from savedWords: [Word], isPreload: Bool) async {
+        let prompt = buildPrompt(from: savedWords)
+
+        do {
+            // ✅ 10초 타임아웃: withThrowingTaskGroup으로 경쟁
+            let rawText = try await withThrowingTaskGroup(of: String.self) { group in
+                group.addTask {
+                    let response = try await self.model.generateContent(prompt)
+                    guard let text = response.text else {
+                        throw URLError(.badServerResponse)
+                    }
+                    return text
+                }
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 10_000_000_000) // 10초
+                    throw URLError(.timedOut)
+                }
+                // 먼저 완료된 Task의 결과를 사용하고 나머지는 취소
+                let result = try await group.next()!
+                group.cancelAll()
+                return result
+            }
+
+            // ✅ Task.detached: JSON 파싱을 메인 스레드에서 완전히 격리
+            // 마크다운 제거 → JSONDecoder 파싱을 백그라운드에서 처리
+            let quiz = try await Task.detached(priority: .userInitiated) {
+                let cleaned = rawText
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .replacingOccurrences(of: "```json", with: "")
+                    .replacingOccurrences(of: "```", with: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+
+                guard let data = cleaned.data(using: .utf8) else {
+                    throw DecodingError.dataCorrupted(
+                        .init(codingPath: [], debugDescription: "UTF-8 변환 실패")
+                    )
+                }
+                return try JSONDecoder().decode(GeneratedQuiz.self, from: data)
+            }.value
+
+            // ✅ 사전 로딩이면 창고에 저장, 일반 요청이면 state 업데이트
+            if isPreload {
+                self.preloadedQuiz = quiz
+            } else {
+                self.state = .success(quiz)
+                // 성공 직후 다음 퀴즈 미리 생성 시작
+                Task { await preloadNextQuiz(from: savedWords) }
+            }
+
+        } catch let error as URLError where error.code == .timedOut {
+            guard !isPreload else { return }
+            self.state = .failure("요청 시간이 초과되었습니다. 다시 시도해주세요.")
+        } catch {
+            guard !isPreload else { return }
+            self.state = .failure("퀴즈 생성에 실패했습니다: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - Private: 프롬프트 빌더
+
+    private func buildPrompt(from savedWords: [Word]) -> String {
+        // ✅ O(1) 랜덤 추출: 배열 셔플 없이 randomElement() 사용
+        let isReviewMode = !savedWords.isEmpty && Bool.random()
+        let selectedStyle = quizStyles.randomElement() ?? quizStyles[0]
+
         let modeInstruction: String
-        
         if isReviewMode {
-            // 🟢 [복습 모드] 내 단어장에서 랜덤으로 하나 뽑기
-            // 🚨 [변경점] 기존의 `!` 강제 추출 대신 안전하게 `?` 사용 후 기본값 처리 (앱 튕김 방지)
-            let seedWord = savedWords.randomElement()?.term ?? "蘋果"
+            // ✅ O(1): savedWords 전체를 섞지 않고 단 하나의 단어만 즉시 추출
+            let seedWord = savedWords.randomElement()?.term ?? "Hello"
             modeInstruction = """
             [현재 모드: 복습 모드]
             사용자가 이미 학습 중인 단어: [ \(seedWord) ]
             이 단어를 '주제'나 '핵심 소재'로 활용해서 5지 선다형 퀴즈를 하나 만들어줘.
             """
         } else {
-            // 🔵 [새 단어 모드] AI가 알아서 유용한 단어 하나 고르기
             modeInstruction = """
             [현재 모드: 새로운 단어 학습 모드]
-            사용자에게 새로운 단어를 가르쳐주려고 해. 
-            HSK 빈출 단어(실생활에서 자주 쓰는 유용한 단어) 중 임의로 '새로운 단어' 하나를 네가 직접 선정해 줘.
+            사용자에게 새로운 단어를 가르쳐주려고 해.
+            \(targetLanguage) 빈출 단어(실생활에서 자주 쓰는 유용한 단어) 중 임의로 '새로운 단어' 하나를 네가 직접 선정해 줘.
             그리고 네가 선정한 그 단어를 '주제'나 '핵심 소재'로 활용해서 5지 선다형 퀴즈를 만들어줘.
             """
         }
-        
-        let styles = [
-            "A와 B의 자연스러운 대화 (Dialogue)",
-            "짧은 에세이 또는 일기 (Essay)",
-            "스마트폰 설정 화면 또는 앱 알림 메시지 (Mobile UI/Settings)",
-            "공공장소 안내문 또는 사용 설명서 (Notice/Instruction)"
-        ]
-        
-        let selectedStyle = styles.randomElement() ?? "짧은 에세이"
-        
-        // 3. 최종 프롬프트 조립
-        let prompt = """
-        너는 중국어 HSK 및 실생활 중국어 전문 강사야.
-        
+
+        return """
+        너는 '\(targetLanguage)' 전문 원어민 강사야.
         \(modeInstruction)
-        
-        [필수 조건 - 아주 중요]:
-        1. 글의 형식: 반드시 '\(selectedStyle)' 스타일로 작성할 것.
-            - 설정 화면이라면: '개인정보 보호', '배터리', '알림' 같은 딱딱하고 간결한 어조.
-            - 안내문이라면: '주의사항', '금지', '이용 방법' 같은 공적인 어조.
-        2. 언어 스타일: '중국 본토(Mainland)' 표준어 어휘 + '번체자(Traditional)' 표기.
-        3. 지문 길이: 2줄 정도로 아주 짧고 간결하게 작성할 것.
-        
-        4. ★ 빈칸(정답) 설정 ★:
-            - 복습 모드든 새 단어 모드든, 빈칸 [____]에 들어갈 정답이 반드시 위에서 선정된 단어일 필요는 없음.
-            - 핵심 단어는 글의 문맥(Context)을 만드는 데 사용하고, 정답은 그 문맥에서 문법적으로나 의미적으로 중요한 다른 단어(동사, 형용사, 접속사 등)여도 됨.
-            - 사용자가 글을 끝까지 읽고 흐름을 파악해야 풀 수 있게 출제해.
-        
-        5. 질문: "다음 글의 빈칸에 들어갈 말로 가장 적절한 것은?" (한국어)
-        6. 보기: 정답 1개, 오답 4개 (모두 번체자).
-        
-        [출력 형식]:
-        오직 JSON 형식으로만 답해 (Markdown 없이).
+
+        [필수 조건]:
+        1. 형식: 반드시 '\(selectedStyle)' 스타일.
+        2. 언어: 철저하게 자연스러운 [\(targetLanguage)]로 작성할 것. (해당 언어의 표준 표기법을 따를 것).
+        3. 길이: 2줄 정도로 짧고 간결하게.
+        4. 빈칸: [____]에 들어갈 정답이 위 핵심 단어일 필요는 없으며 문법/의미적으로 중요한 단어로 출제.
+        5. 질문: "다음 글의 빈칸에 들어갈 말로 가장 적절한 것은?" (이 질문만 한국어로 고정)
+        6. 보기: 정답 1개, 오답 4개 (보기 내용은 모두 \(targetLanguage)).
+
+        [출력 형식 - JSON만 반환 (Markdown 금지)]:
         {
             "passage": "지문 내용...",
             "question": "문제...",
@@ -93,43 +169,5 @@ class QuizViewModel: ObservableObject {
             "answerIndex": 0
         }
         """
-        
-        // 4. AI 요청 및 처리
-        do {
-            let response = try await model.generateContent(prompt)
-            guard let text = response.text else {
-                state = .failure(Constants.Errors.noResponse)
-                return
-            }
-            
-            // 🧹 마크다운 찌꺼기 깔끔하게 지우기
-            let cleanText = text.replacingOccurrences(of: "`" + "`" + "`json", with: "")
-                                .replacingOccurrences(of: "`" + "`" + "`", with: "")
-                                .trimmingCharacters(in: .whitespacesAndNewlines)
-            
-            if let data = cleanText.data(using: .utf8) {
-                let decodedQuiz = try JSONDecoder().decode(GeneratedQuiz.self, from: data)
-                // 🌟 성공: 데이터 파싱까지 완료되면 success 상태로 변경!
-                state = .success(decodedQuiz)
-            } else {
-                state = .failure(Constants.Errors.dataParseFailed)
-            }
-        } catch {
-            // 🚨 에러: 인터넷 끊김 등 각종 통신 에러 처리
-            if let urlError = error as? URLError {
-                switch urlError.code {
-                case .notConnectedToInternet:
-                    state = .failure(Constants.Errors.internetDisconnected)
-                case .timedOut:
-                    state = .failure(Constants.Errors.timeOut)
-                case .networkConnectionLost:
-                    state = .failure(Constants.Errors.connectionLost)
-                default:
-                    state = .failure("\(Constants.Errors.networkErrorPrefix) (\(urlError.localizedDescription))")
-                }
-            } else {
-                state = .failure("\(Constants.Errors.unknownErrorPrefix) \(error.localizedDescription) 😢")
-            }
-        }
     }
 }

@@ -3,7 +3,7 @@ import Foundation
 // 🌟 AWS 서버와 통신도 하고, 리스트에도 띄우는 완벽한 모델
 struct Word: Identifiable, Codable {
     var id: Int64?
-    
+    var quizAppearCount: Int64?
     var term: String
     var meaning: String
     
@@ -24,6 +24,7 @@ struct Word: Identifiable, Codable {
         case isMemorized = "memorized" // 서버가 "memorized"로 주면 내 변수 "isMemorized"에 넣어라!
         case isRevealed = "revealed"   // 서버가 "revealed"로 주면 내 변수 "isRevealed"에 넣어라!
         case pronunciation, koreanEx, example, usageContext, createdAt
+        case quizAppearCount
     }
 }
 

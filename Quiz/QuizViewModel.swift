@@ -3,8 +3,7 @@ import SwiftUI
 import Combine
 
 // ==========================================
-// QuizViewModel - AIManager 연동 버전
-// GenerativeModel 직접 호출 → AIManager.shared 로 교체
+// MARK: - Models
 // ==========================================
 enum QuizState {
     case idle
@@ -13,9 +12,10 @@ enum QuizState {
     case failure(String)
 }
 
-// MARK: - GeneratedQuiz Model
-
-
+// ==========================================
+// MARK: - QuizViewModel
+// AIManager 연동 + 출현 빈도수 기반 단어 추출
+// ==========================================
 @MainActor
 class QuizViewModel: ObservableObject {
     @Published var state: QuizState = .idle
@@ -54,75 +54,80 @@ class QuizViewModel: ObservableObject {
         isPreloading = false
     }
 
-    // MARK: - Private: AI 통신 (AIManager로 교체)
-    private func fetchQuizFromAI(from savedWords: [Word], isPreload: Bool) async {
-        let prompt = buildPrompt(from: savedWords)
-
-        do {
-            // 🌟 핵심 변경: model.generateContent() → AIManager.shared.generateText()
-            // Gemini 실패 시 자동으로 GPT-4o-mini로 폴백됨
-            let rawText = try await AIManager.shared.generateText(prompt: prompt)
-            
-            let provider = AIManager.shared.lastUsedProvider == .gemini ? "Gemini" : "GPT-4o-mini (폴백)"
-            print("🎯 [\(provider)] 퀴즈 생성 완료")
-
-            // JSON 파싱은 백그라운드에서
-            let quiz = try await Task.detached(priority: .userInitiated) {
-                let cleaned = rawText
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                    .replacingOccurrences(of: "```json", with: "")
-                    .replacingOccurrences(of: "```", with: "")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-
-                guard let data = cleaned.data(using: .utf8) else {
-                    throw DecodingError.dataCorrupted(
-                        .init(codingPath: [], debugDescription: "UTF-8 변환 실패")
-                    )
-                }
-                return try JSONDecoder().decode(GeneratedQuiz.self, from: data)
-            }.value
-
-            if isPreload {
-                self.preloadedQuiz = quiz
-            } else {
-                self.state = .success(quiz)
-                Task { await self.preloadNextQuiz(from: savedWords) }
+    // MARK: - Private: AI 통신 및 로직 처리
+        private func fetchQuizFromAI(from savedWords: [Word], isPreload: Bool) async {
+            // 🌟 [에러 1 해결] 정렬 로직을 컴파일러가 헷갈리지 않게 명확하게 풀어서 작성!
+            let sortedWords = savedWords.sorted { word1, word2 in
+                let count1 = word1.quizAppearCount ?? 0
+                let count2 = word2.quizAppearCount ?? 0
+                return count1 < count2
             }
 
-        } catch let error as URLError where error.code == .timedOut {
-            guard !isPreload else { return }
-            self.state = .failure("요청 시간이 초과되었습니다. 다시 시도해주세요.")
-        } catch {
-            guard !isPreload else { return }
-            self.state = .failure("퀴즈 생성에 실패했습니다: \(error.localizedDescription)")
-        }
-    }
+            guard let targetWord = sortedWords.first else {
+                guard !isPreload else { return }
+                self.state = .failure("저장된 단어가 없습니다. 단어를 먼저 추가해 주세요.")
+                return
+            }
 
-    // MARK: - Private: 프롬프트 빌더 (기존 유지)
-    private func buildPrompt(from savedWords: [Word]) -> String {
-        let isReviewMode = !savedWords.isEmpty && Bool.random()
+            let prompt = buildPrompt(for: targetWord)
+
+            do {
+                let rawText = try await AIManager.shared.generateText(prompt: prompt)
+                
+                let provider = AIManager.shared.lastUsedProvider == .gemini ? "Gemini" : "GPT-4o-mini (폴백)"
+                print("🎯 [\(provider)] 퀴즈 생성 완료 (선정된 단어: \(targetWord.term))")
+
+                let quiz = try await Task.detached(priority: .userInitiated) {
+                    // 🌟 [에러 2 해결] CharacterSet 풀네임을 적어줘서 소속을 확실히 밝힘!
+                    var cleaned = rawText.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+                    
+                    if cleaned.hasPrefix("```json") { cleaned.removeFirst(7) }
+                    else if cleaned.hasPrefix("```") { cleaned.removeFirst(3) }
+                    if cleaned.hasSuffix("```") { cleaned.removeLast(3) }
+                    
+                    // 여기도 CharacterSet 풀네임 적용
+                    cleaned = cleaned.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+
+                    guard let data = cleaned.data(using: .utf8) else {
+                        throw DecodingError.dataCorrupted(
+                            .init(codingPath: [], debugDescription: "UTF-8 변환 실패")
+                        )
+                    }
+                    return try JSONDecoder().decode(GeneratedQuiz.self, from: data)
+                }.value
+
+                if let wordId = targetWord.id {
+                    Task {
+                        await APIManager.shared.increaseQuizAppearCount(wordId: Int(wordId))
+                    }
+                }
+
+                if isPreload {
+                    self.preloadedQuiz = quiz
+                } else {
+                    self.state = .success(quiz)
+                    Task { await self.preloadNextQuiz(from: savedWords) }
+                }
+
+            } catch let error as URLError where error.code == .timedOut {
+                guard !isPreload else { return }
+                self.state = .failure("요청 시간이 초과되었습니다. 다시 시도해주세요.")
+            } catch {
+                guard !isPreload else { return }
+                self.state = .failure("퀴즈 생성에 실패했습니다: \(error.localizedDescription)")
+            }
+        }
+
+    // MARK: - Private: 프롬프트 빌더 (특정 단어 타겟팅으로 변경)
+    private func buildPrompt(for word: Word) -> String {
         let selectedStyle = quizStyles.randomElement() ?? quizStyles[0]
-
-        let modeInstruction: String
-        if isReviewMode {
-            let seedWord = savedWords.randomElement()?.term ?? "Hello"
-            modeInstruction = """
-            [현재 모드: 복습 모드]
-            사용자가 이미 학습 중인 단어: [ \(seedWord) ]
-            이 단어를 '주제'나 '핵심 소재'로 활용해서 5지 선다형 퀴즈를 하나 만들어줘.
-            """
-        } else {
-            modeInstruction = """
-            [현재 모드: 새로운 단어 학습 모드]
-            사용자에게 새로운 단어를 가르쳐주려고 해.
-            \(targetLanguage) 빈출 단어 중 임의로 '새로운 단어' 하나를 네가 직접 선정해 줘.
-            그리고 네가 선정한 그 단어를 '주제'나 '핵심 소재'로 활용해서 5지 선다형 퀴즈를 만들어줘.
-            """
-        }
 
         return """
         너는 '\(targetLanguage)' 전문 원어민 강사야.
-        \(modeInstruction)
+        
+        [현재 모드: 맞춤형 퀴즈 생성 모드]
+        사용자가 지금 학습해야 할 최우선 단어는 [ \(word.term) (\(word.meaning)) ] 야.
+        이 단어를 '주제'나 '핵심 소재' 혹은 '정답'으로 활용해서 5지 선다형 퀴즈를 하나 만들어줘.
 
         [필수 조건]:
         1. 형식: 반드시 '\(selectedStyle)' 스타일.

@@ -26,6 +26,24 @@ class APIManager {
         let (_, _) = try await URLSession.shared.data(for: request)
     }
     
+    func increaseQuizAppearCount(wordId: Int) async {
+        // 🌟 조원이 만든 POST /api/words/{id}/appear 호출
+        guard let url = URL(string: "http://너의서버주소/api/words/\(wordId)/appear") else { return }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                print("✅ 서버에 카운트 +1 반영 완료 (Word ID: \(wordId))")
+            } else {
+                print("❌ 카운트 증가 실패")
+            }
+        } catch {
+            print("❌ 통신 에러: \(error)")
+        }
+    }
     // 🗑️ [수정됨] wordId 타입을 String에서 Int64로 변경!
     func deleteWord(wordId: Int64) async throws {
         // 숫자인 wordId를 문자열 주소 안에 넣을 땐 \(wordId)라고 쓰면 자동으로 변환돼!

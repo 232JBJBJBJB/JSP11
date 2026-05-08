@@ -79,6 +79,7 @@
 		4778A4CD2F63F55F0097CCB1 /* CameraManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraManager.swift; sourceTree = "<group>"; };
 		4778A4CE2F63F5780097CCB1 /* MainCameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainCameraView.swift; sourceTree = "<group>"; };
 		4778A4EA2F68DE4D0097CCB1 /* ARViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARViewModel.swift; sourceTree = "<group>"; };
+		47B3DD822FAC47FF00038045 /* LearningUI-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "LearningUI-Bridging-Header.h"; sourceTree = "<group>"; };
 		47C3C1E82F74010200503C09 /* ARNetworkManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARNetworkManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -132,6 +133,7 @@
 		4718C57E2F3594E20041E7E9 = {
 			isa = PBXGroup;
 			children = (
+				47B3DD822FAC47FF00038045 /* LearningUI-Bridging-Header.h */,
 				4746E0C22F876A7100F20F89 /* opencv2.framework */,
 				4754F6A12F875B4A00A9E26E /* ARBubbleRender */,
 				4708B2422F7F4D9500936F49 /* .gitignore */,
@@ -582,6 +584,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "/Users/jblee/Documents/GitHub/JSP11/LearningUI-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -627,6 +630,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "/Users/jblee/Documents/GitHub/JSP11/LearningUI-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";

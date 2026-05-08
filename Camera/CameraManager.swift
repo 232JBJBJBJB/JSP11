@@ -38,7 +38,7 @@ class CameraManager: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleB
         }
     }
     
-    // 2. 카메라 세팅 (쓸데없는 래핑 제거하고 깔끔하게 최적화)
+    // 2. 카메라 세팅
     private func setupCamera() async {
         session.beginConfiguration()
         
@@ -59,9 +59,18 @@ class CameraManager: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleB
             session.addOutput(videoOutput)
         }
         
+        // =========================================================
+        // 🌟 [핵심 마법 1] C++ 한테 넘기기 전에 물리적으로 세로(Portrait)로 찍기!
+        // =========================================================
+        if let connection = videoOutput.connection(with: .video) {
+            if connection.isVideoOrientationSupported {
+                connection.videoOrientation = .portrait
+            }
+        }
+        
         session.commitConfiguration()
         
-        // 🌟 [복구 2] 스레드 안전성 보장 (미리 꺼내서 백그라운드에 넘기기)
+        // 🌟 스레드 안전성 보장 (미리 꺼내서 백그라운드에 넘기기)
         let currentSession = self.session
         videoQueue.async {
             currentSession.startRunning()
@@ -69,7 +78,7 @@ class CameraManager: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleB
     }
     
     // ==========================================
-    // 🌟 [복구 3] 찰칵 모션 & 하드웨어 제어용 함수 부활!
+    // 🌟 찰칵 모션 & 하드웨어 제어용 함수
     // ==========================================
     
     // 🛑 카메라 일시 정지 (캡처 화면 띄울 때 호출)
@@ -94,18 +103,31 @@ class CameraManager: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleB
         }
     }
     
-    // 3. 📸 데이터 바구니 (무거운 작업이므로 UI를 방해하지 않게 nonisolated)
+    // 3. 📸 데이터 바구니
     nonisolated func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        
+            
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        
+            
+        // 1. 카메라 센서 데이터를 Swift용 UIImage로 변환
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
         guard let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) else { return }
-        let uiImage = UIImage(cgImage: cgImage, scale: 1.0, orientation: .right)
         
-        // 완성본 메인 화면으로 던지기
-        Task { @MainActor in
-            self.currentFrame = uiImage
+        // =========================================================
+        // 🌟 [핵심 마법 2] 하드웨어가 세로로 줬으니 꼬리표는 .up으로 세팅!
+        // =========================================================
+        let uiImage = UIImage(cgImage: cgImage, scale: 1.0, orientation: .up)
+            
+        // =========================================================
+        // 🌟 드디어 C++ (ARBridge) 다시 연결!
+        // =========================================================
+        if let processedImage = C_RenderEnhancedBubbles(uiImage, true, 1.0) {
+            Task { @MainActor in
+                self.currentFrame = processedImage
+            }
+        } else {
+            Task { @MainActor in
+                self.currentFrame = uiImage
+            }
         }
     }
 }

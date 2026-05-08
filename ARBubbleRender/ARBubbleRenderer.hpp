@@ -1,6 +1,6 @@
 #ifndef ARBubbleRenderer_hpp
 #define ARBubbleRenderer_hpp
-
+#import "ARBridge.h"
 #include <opencv2/opencv.hpp>
 #include <string>
 #include <vector>

@@ -20,7 +20,10 @@ struct CameraPreview: UIViewRepresentable {
     func makeUIView(context: Context) -> VideoPreviewView {
         let view = VideoPreviewView()
         view.videoPreviewLayer.session = session
+        
+        // 🌟 [수정 완료] videoLayer -> view.videoPreviewLayer 로 정확하게 지칭!
         view.videoPreviewLayer.videoGravity = .resizeAspectFill
+        
         return view
     }
     

@@ -109,9 +109,16 @@ void ARBubbleRenderer::RenderEnhanced(cv::Mat& frame, bool applyBlur, float upsc
     if (applyBlur && !currentWords.empty()) { // (변수명 applyBlur는 밖에서 통제하므로 그대로 둡니다)
         cv::Mat grayBackground;
 
-        // 1. 전체 화면 흑백 변환 (연산량 매우 적음)
-        cv::cvtColor(frame, grayBackground, cv::COLOR_BGR2GRAY);
-        cv::cvtColor(grayBackground, grayBackground, cv::COLOR_GRAY2BGR); // 사본과 채널 수를 맞춤
+        if (frame.channels() == 4) {
+            // iOS 카메라 환경 (RGBA)
+            cv::cvtColor(frame, grayBackground, cv::COLOR_RGBA2GRAY);
+            cv::cvtColor(grayBackground, grayBackground, cv::COLOR_GRAY2RGBA);
+        }
+        else {
+            // Visual Studio 테스트 환경 (BGR)
+            cv::cvtColor(frame, grayBackground, cv::COLOR_BGR2GRAY);
+            cv::cvtColor(grayBackground, grayBackground, cv::COLOR_GRAY2BGR);
+        }
 
         cv::Mat mask = cv::Mat::zeros(frame.size(), CV_8UC1);
 

@@ -91,17 +91,23 @@ class WordViewModel: ObservableObject {
     }
     
     // MARK: - 🔄 [PUT] 서버에 단어 정보 업데이트하기
-    func updateWord(word: Word) {
-        Task {
-            do {
-                try await APIManager.shared.updateWord(word: word)
-                print("✅ [통신 성공] 단어 업데이트 완료!")
-                loadWords()
-            } catch {
-                print("❌ [통신 실패] 단어 업데이트 에러: \(error.localizedDescription)")
+        func updateWord(word: Word) {
+            // 🌟 [핵심 해결] 전체 새로고침 대신, 로컬 배열에서 해당 단어만 싹 바꿔치기!
+            // 이렇게 하면 화면 튕김(강제 Pop) 현상이 완벽하게 사라져.
+            if let index = words.firstIndex(where: { $0.id == word.id }) {
+                words[index] = word
+            }
+            
+            Task {
+                do {
+                    try await APIManager.shared.updateWord(word: word)
+                    print("✅ [통신 성공] 단어 업데이트 완료!")
+                    // loadWords()  <--- 🚨 이거 반드시 지워야 해!! 앱 튕김의 주범이야!
+                } catch {
+                    print("❌ [통신 실패] 단어 업데이트 에러: \(error.localizedDescription)")
+                }
             }
         }
-    }
     
     // ⭐ 즐겨찾기(별표) 토글
     func toggleMemorized(word: Word) {

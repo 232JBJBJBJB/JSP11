@@ -4,7 +4,7 @@ struct MainCameraView: View {
     @StateObject private var cameraManager = CameraManager.shared
     @StateObject private var arViewModel = ARViewModel()
     @StateObject private var arNetworkManager = ARNetworkManager()
-    @StateObject private var wordVM = WordViewModel()
+    @EnvironmentObject var wordVM: WordViewModel
     
     @AppStorage("targetLanguage") private var targetLanguage: String = "영어"
     @AppStorage("targetVoiceStyle") private var targetVoiceStyle: String = "표준"
@@ -13,6 +13,7 @@ struct MainCameraView: View {
     
     @State private var frozenImage: UIImage? = nil
     @State private var captureAnimationValue: Double = 0.0
+    @State private var savedWordIDs: Set<UUID> = []
     
     var body: some View {
         ZStack {
@@ -36,6 +37,7 @@ struct MainCameraView: View {
                                 .grayscale(arViewModel.discoveredWords.isEmpty ? 0.0 : 1.0)
                                 .blur(radius: arViewModel.discoveredWords.isEmpty ? 0 : 4)
                                 .animation(.easeInOut(duration: 0.8), value: arViewModel.discoveredWords.isEmpty)
+                                .drawingGroup() // 🌟 [용의자 2 해결] GPU에서 이미지를 한 장으로 납작하게 합쳐서 메모리 폭발(OOM) 방지!
                             
                             // 2. 인식된 사물 영역 하이라이트 (컬러 스포트라이트)
                             if !arViewModel.discoveredWords.isEmpty {
@@ -69,6 +71,7 @@ struct MainCameraView: View {
                                         }
                                     )
                                     .transition(.opacity)
+                                    .drawingGroup() // 🌟 [용의자 2 해결] 마스크와 오버레이 연산도 합쳐서 메모리 최적화!
                             }
                         }
                     } else {
@@ -132,7 +135,27 @@ struct MainCameraView: View {
                                     )
                                     
                                     VStack(spacing: 4) {
-                                        Text(word.word).font(.title).bold()
+                                        HStack(alignment: .center, spacing: 8) {
+                                            Text(word.word).font(.title).bold()
+                                            let isAlreadySaved = savedWordIDs.contains(word.id) || wordVM.words.contains(where: { $0.term == word.word })
+                                            Button {
+                                                Task {
+                                                    let success = await wordVM.addWord(term: word.word, meaning: word.meaning, pos: word.pos ?? "명사")
+                                                    if success {
+                                                        // 🌟 [용의자 1 해결] UI 업데이트는 무조건 메인 스레드에서 실행!
+                                                        await MainActor.run {
+                                                            savedWordIDs.insert(word.id)
+                                                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                                                        }
+                                                    }
+                                                }
+                                            } label: {
+                                                Image(systemName: isAlreadySaved ? "checkmark.circle.fill" : "plus.circle.fill")
+                                                    .font(.system(size: 24))
+                                                    .foregroundColor(isAlreadySaved ? .green : .blue)
+                                            }
+                                            .disabled(isAlreadySaved)
+                                        }
                                         Text(word.pronunciation).font(.caption)
                                         Text(word.meaning).font(.footnote)
                                     }
@@ -232,6 +255,7 @@ struct MainCameraView: View {
         .onAppear {
             cameraManager.checkPermission()
             arNetworkManager.connect()
+            wordVM.loadWords()  // 기존 단어 로드 (중복 체크용)
         }
         .onDisappear {
             arNetworkManager.disconnect()
@@ -260,7 +284,6 @@ struct MainCameraView: View {
         }
         
         Task {
-            // 분석만 실행하고, UI 렌더링은 SwiftUI 프레임워크 단에서 처리합니다.
             let _ = await arViewModel.analyzeScene(
                 image: image,
                 targetLanguage: targetLanguage,
@@ -272,41 +295,37 @@ struct MainCameraView: View {
     }
     
     // ==========================================
-        // 🌟 화면 이탈 방지(Clamping)가 적용된 좌표 번역기
-        // ==========================================
-        func convertToScreenCoordinate(relativeX: Double, relativeY: Double, imageSize: CGSize, screenSize: CGSize) -> CGPoint {
-            // 1. 원본 스케일 계산 (기존과 동일)
-            let scaleFactor = max(screenSize.width / imageSize.width, screenSize.height / imageSize.height)
-            let scaledWidth = imageSize.width * scaleFactor
-            let scaledHeight = imageSize.height * scaleFactor
-            let offsetX = (scaledWidth - screenSize.width) / 2.0
-            let offsetY = (scaledHeight - screenSize.height) / 2.0
-            
-            // 2. AI가 알려준 원래 좌표
-            let finalX = (CGFloat(relativeX) * scaledWidth) - offsetX
-            let finalY = (CGFloat(relativeY) * scaledHeight) - offsetY
-            
-            // 3. 🌟 C++에서 훔쳐 온(?) 화면 테두리 고정 로직!
-            // 말풍선의 대략적인 절반 크기를 여백(Margin)으로 설정해.
-            // 글자 길이에 따라 다르겠지만, 가로 70, 세로 60 정도면 안전해.
-            let marginX: CGFloat = 70.0
-            let marginY: CGFloat = 60.0
-            
-            // x 좌표 방어: 화면 왼쪽 테두리(marginX)보다 작으면 밀어 넣고, 오른쪽 테두리보다 크면 당겨옴!
-            let safeX = max(marginX, min(finalX, screenSize.width - marginX))
-            
-            // y 좌표 방어: 화면 위쪽, 아래쪽 테두리도 똑같이 방어!
-            // (하단은 버튼 영역이 있으니 여백을 살짝 더 줘도 좋아. 예를 들어 screenSize.height - 100.0)
-            let safeY = max(marginY, min(finalY, screenSize.height - marginY - 80.0)) // 하단 버튼 가리지 않게 추가 여백
-            
-            return CGPoint(x: safeX, y: safeY)
-        }
+    // 🌟 화면 이탈 방지(Clamping)가 적용된 좌표 번역기
+    // ==========================================
+    func convertToScreenCoordinate(relativeX: Double, relativeY: Double, imageSize: CGSize, screenSize: CGSize) -> CGPoint {
+        
+        // 🌟 [용의자 3 해결] 0으로 나누기 방지 유지
+        guard imageSize.width > 0 && imageSize.height > 0 else { return .zero }
+        
+        let scaleFactor = max(screenSize.width / imageSize.width, screenSize.height / imageSize.height)
+        let scaledWidth = imageSize.width * scaleFactor
+        let scaledHeight = imageSize.height * scaleFactor
+        let offsetX = (scaledWidth - screenSize.width) / 2.0
+        let offsetY = (scaledHeight - screenSize.height) / 2.0
+        
+        let finalX = (CGFloat(relativeX) * scaledWidth) - offsetX
+        let finalY = (CGFloat(relativeY) * scaledHeight) - offsetY
+        
+        let marginX: CGFloat = 70.0
+        let marginY: CGFloat = 60.0
+        
+        let safeX = max(marginX, min(finalX, screenSize.width - marginX))
+        let safeY = max(marginY, min(finalY, screenSize.height - marginY - 80.0))
+        
+        return CGPoint(x: safeX, y: safeY)
+    }
     
     private func resetCamera() {
         withAnimation {
             frozenImage = nil
             arViewModel.discoveredWords.removeAll()
             arViewModel.errorMessage = nil
+            savedWordIDs.removeAll()
         }
         cameraManager.startSession()
     }

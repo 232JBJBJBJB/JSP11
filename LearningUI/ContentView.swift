@@ -12,9 +12,9 @@ struct ContentView: View {
     @State private var showSettings: Bool = false
 
     var body: some View {
+        // 🌟 1. 이 NavigationStack 전체를 뷰모델로 감싸야 해!
         NavigationStack {
             ZStack {
-                
                 List {
                     ForEach(viewModel.filteredWords) { word in
                         WordListRowView(word: word, onToggleStar: {
@@ -27,19 +27,10 @@ struct ContentView: View {
                 }
                 .scrollContentBackground(.hidden)
                 .scrollDismissesKeyboard(.immediately)
-                // ==========================================
-                // 🌟 추가 1: 당겨서 새로고침 (Pull-to-Refresh) 기능!
-                // ==========================================
                 .refreshable {
                     viewModel.loadWords()
                 }
-                // ==========================================
-                // 🌟 추가 2: 화면에 돌아올 때마다 확실하게 새로고침!
-                // (기존 밖의 ZStack에 있던 걸 List에 딱 붙여서 확실히 동작하게 함)
-                // ==========================================
-                .onAppear {
-                    viewModel.loadWords()
-                }
+                // 🚨 여기에 있던 애매한 .environmentObject는 지웠어!
                 .safeAreaInset(edge: .bottom) {
                     AddWordBottomBarView(newTerm: $newTerm, newMeaning: $newMeaning, onAdd: addNewWord)
                 }
@@ -57,7 +48,7 @@ struct ContentView: View {
                     ToolbarItem(placement: .topBarLeading) {
                         HStack(spacing: 16) {
                             // 카메라 버튼
-                            NavigationLink(destination: MainCameraView().environmentObject(viewModel)) {
+                            NavigationLink(destination: MainCameraView()) {
                                 Image(systemName: Constants.Icons.camera)
                                     .font(.title3)
                                     .foregroundStyle(.blue)
@@ -78,7 +69,6 @@ struct ContentView: View {
                     ToolbarItem(placement: .topBarTrailing) {
                         NavigationLink(
                             destination: QuizView(quizViewModel: quizViewModel)
-                                .environmentObject(viewModel)
                         ) {
                             Image(systemName: Constants.Icons.gameController)
                                 .font(.title3)
@@ -90,6 +80,14 @@ struct ContentView: View {
                 }
             }
         }
+        // =======================================================
+        // 🌟 2. [핵심 해결] NavigationStack 전체에 뷰모델을 확실하게 주입!
+        // 이제 카메라 화면, 상세 화면, 퀴즈 화면 어디로 가든 절대 튕기지 않아.
+        // =======================================================
+        .environmentObject(viewModel)
+        .onAppear {
+            viewModel.loadWords()
+        }
     }
 
     private func addNewWord() {
@@ -98,7 +96,7 @@ struct ContentView: View {
             if success {
                 newTerm = ""
                 newMeaning = ""
-                // 🌟 추가 3: 하단 바에서 단어 추가 직후에도 목록 새로고침
+                // 🌟 하단 바에서 단어 추가 직후에도 목록 새로고침
                 viewModel.loadWords()
             }
         }

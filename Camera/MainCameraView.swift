@@ -37,7 +37,7 @@ struct MainCameraView: View {
                                 .grayscale(arViewModel.discoveredWords.isEmpty ? 0.0 : 1.0)
                                 .blur(radius: arViewModel.discoveredWords.isEmpty ? 0 : 4)
                                 .animation(.easeInOut(duration: 0.8), value: arViewModel.discoveredWords.isEmpty)
-                                .drawingGroup() // 🌟 [용의자 2 해결] GPU에서 이미지를 한 장으로 납작하게 합쳐서 메모리 폭발(OOM) 방지!
+                                .drawingGroup()
                             
                             // 2. 인식된 사물 영역 하이라이트 (컬러 스포트라이트)
                             if !arViewModel.discoveredWords.isEmpty {
@@ -71,7 +71,7 @@ struct MainCameraView: View {
                                         }
                                     )
                                     .transition(.opacity)
-                                    .drawingGroup() // 🌟 [용의자 2 해결] 마스크와 오버레이 연산도 합쳐서 메모리 최적화!
+                                    .drawingGroup()
                             }
                         }
                     } else {
@@ -142,7 +142,6 @@ struct MainCameraView: View {
                                                 Task {
                                                     let success = await wordVM.addWord(term: word.word, meaning: word.meaning, pos: word.pos ?? "명사")
                                                     if success {
-                                                        // 🌟 [용의자 1 해결] UI 업데이트는 무조건 메인 스레드에서 실행!
                                                         await MainActor.run {
                                                             savedWordIDs.insert(word.id)
                                                             UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -255,7 +254,7 @@ struct MainCameraView: View {
         .onAppear {
             cameraManager.checkPermission()
             arNetworkManager.connect()
-            wordVM.loadWords()  // 기존 단어 로드 (중복 체크용)
+            wordVM.loadWords()
         }
         .onDisappear {
             arNetworkManager.disconnect()
@@ -299,7 +298,6 @@ struct MainCameraView: View {
     // ==========================================
     func convertToScreenCoordinate(relativeX: Double, relativeY: Double, imageSize: CGSize, screenSize: CGSize) -> CGPoint {
         
-        // 🌟 [용의자 3 해결] 0으로 나누기 방지 유지
         guard imageSize.width > 0 && imageSize.height > 0 else { return .zero }
         
         let scaleFactor = max(screenSize.width / imageSize.width, screenSize.height / imageSize.height)

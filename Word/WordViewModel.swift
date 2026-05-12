@@ -102,7 +102,6 @@ class WordViewModel: ObservableObject {
                 do {
                     try await APIManager.shared.updateWord(word: word)
                     print("✅ [통신 성공] 단어 업데이트 완료!")
-                    // loadWords()  <--- 🚨 이거 반드시 지워야 해!! 앱 튕김의 주범이야!
                 } catch {
                     print("❌ [통신 실패] 단어 업데이트 에러: \(error.localizedDescription)")
                 }

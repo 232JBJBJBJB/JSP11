@@ -1,4 +1,3 @@
-// 🌟 [복구 1] 마법의 키워드: AVFoundation 깐깐한 스레드 검사에서 제외!
 @preconcurrency import AVFoundation
 import SwiftUI
 import Combine
@@ -60,7 +59,7 @@ class CameraManager: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleB
         }
         
         // =========================================================
-        // 🌟 [핵심 마법 1] C++ 한테 넘기기 전에 물리적으로 세로(Portrait)로 찍기!
+        // 🌟 물리적으로 세로(Portrait)로 찍기
         // =========================================================
         if let connection = videoOutput.connection(with: .video) {
             if connection.isVideoOrientationSupported {
@@ -112,22 +111,15 @@ class CameraManager: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleB
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
         guard let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) else { return }
         
-        // =========================================================
-        // 🌟 [핵심 마법 2] 하드웨어가 세로로 줬으니 꼬리표는 .up으로 세팅!
-        // =========================================================
+        // 2. 하드웨어가 세로로 줬으니 꼬리표는 .up으로 세팅!
         let uiImage = UIImage(cgImage: cgImage, scale: 1.0, orientation: .up)
             
         // =========================================================
-        // 🌟 드디어 C++ (ARBridge) 다시 연결!
+        // 🌟 [핵심 해결] C++ 브릿지(C_RenderEnhancedBubbles) 완전 제거!
+        // 폰 카메라가 찍은 쌩얼(원본 사진)을 그대로 화면에 던져줍니다.
         // =========================================================
-        if let processedImage = C_RenderEnhancedBubbles(uiImage, true, 1.0) {
-            Task { @MainActor in
-                self.currentFrame = processedImage
-            }
-        } else {
-            Task { @MainActor in
-                self.currentFrame = uiImage
-            }
+        Task { @MainActor in
+            self.currentFrame = uiImage
         }
     }
 }

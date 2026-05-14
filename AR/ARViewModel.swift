@@ -26,7 +26,7 @@ struct ARWord: Codable, Identifiable {
 }
 
 // ==========================================
-// ARViewModel - AIManager 연동 버전
+// 2. ARViewModel - AIManager 연동 및 UX/속도 개선 버전
 // ==========================================
 @MainActor
 class ARViewModel: ObservableObject {
@@ -34,18 +34,20 @@ class ARViewModel: ObservableObject {
     @Published var isAnalyzing = false
     @Published var errorMessage: String? = nil
     
-    // ==========================================
-    // 3. 제미나이 분석 실행 함수 (AIManager 연동)
-    // ==========================================
-    // 🌟 [핵심 변경] 분석이 끝난 후 C++ 처리가 완료된 '흑백+블러 이미지'를 반환하도록 수정!
+    // 🌟 [조원 아이디어 1] 단계별 로딩 상태를 알려줄 변수 추가
+    @Published var analysisStage: String = ""
+    
     func analyzeScene(image: UIImage, targetLanguage: String, styleOption: String, targetPos: String, existingWords: [String] = []) async -> UIImage? {
         self.isAnalyzing = true
         self.errorMessage = nil
         self.discoveredWords.removeAll()
+        self.analysisStage = "이미지 준비 중..." // 🌟 진행 상태 업데이트
         
-        guard let optimizedImage = resizeImage(image: image, targetWidth: 800) else {
+        // 🌟 [조원 아이디어 2] 통신 속도를 위해 이미지 사이즈 대폭 압축 (800 -> 512)
+        guard let optimizedImage = resizeImage(image: image, targetWidth: 512) else {
             self.errorMessage = "이미지 최적화에 실패했습니다."
             self.isAnalyzing = false
+            self.analysisStage = ""
             return nil
         }
         
@@ -67,7 +69,7 @@ class ARViewModel: ObservableObject {
         [중요 규칙]
         1. 사진을 분석해서 \(posInstruction) 추출해.
         2. 반드시 한국어 뜻(meaning)은 명확하게 1~2개 단어로만 적어.
-        3. 🌟 발음 기호(pronunciation): 반드시 대륙식 보통화(Mandarin) 기준의 '표준 한어병음(Hanyu Pinyin, 1~4성 숫자 표기)'으로만 적어. 광둥어(Jyutping)나 한국어 한자 독음(예: '있을 유')은 절대 포함하지 마.
+        3. 🌟 발음 기호(pronunciation): 반드시 대륙식 보통화(Mandarin) 기준의 '표준 한어병음(Hanyu Pinyin, 1~4성 숫자 표기)'으로만 적어. 광둥어(Jyutping)이나 한국어 한자 독음(예: '있을 유')은 절대 포함하지 마.
         4. 🌟 해당 사물이 사진의 어느 위치에 있는지 중심 좌표를 가로 비율(relativeX, 0.0 왼쪽 ~ 1.0 오른쪽)과 세로 비율(relativeY, 0.0 상단 ~ 1.0 하단)로 반드시 계산해서 소수점으로 포함해.
         5. 응답은 무조건 아래 JSON 형식으로만 줘. 마크다운(` ```json `)이나 다른 설명은 절대 넣지 마.
         
@@ -84,11 +86,15 @@ class ARViewModel: ObservableObject {
         ]
         """
         
+        self.analysisStage = "AI가 화면을 분석하고 있어요..." // 🌟 진행 상태 업데이트
+        
         do {
             let resultText = try await AIManager.shared.generateTextFromImage(
                 prompt: prompt,
                 image: optimizedImage
             )
+            
+            self.analysisStage = "단어를 인식하고 있어요..." // 🌟 진행 상태 업데이트
             
             var cleanedText = resultText.trimmingCharacters(in: .whitespacesAndNewlines)
             if cleanedText.hasPrefix("```json") { cleanedText.removeFirst(7) }
@@ -102,8 +108,9 @@ class ARViewModel: ObservableObject {
             }
             
             let decodedWords = try JSONDecoder().decode([ARWord].self, from: data)
-            
             let filteredWords = decodedWords.filter { !existingWords.contains($0.word) }
+            
+            self.analysisStage = "말풍선을 그리고 있어요..." // 🌟 진행 상태 업데이트
             
             // =========================================================
             // 🌟 C++ 엔진에 분석된 단어와 컬러 포커스용 '가짜 박스' 좌표 쏴주기
@@ -127,21 +134,19 @@ class ARViewModel: ObservableObject {
                 )
             }
             
-            // 🌟 [핵심 타이밍 마법] 단어 세팅이 끝났으니, 정지된 원본 사진을 C++로 보내서 흑백+말풍선을 그려옴!
             var finalProcessedImage: UIImage? = nil
             if !filteredWords.isEmpty {
-                // 방금 찍었던 원본 사진(image)을 넣고 흑백 블러(applyBlur: true) 실행!
                 finalProcessedImage = C_RenderEnhancedBubbles(image, true, 1.0)
             }
-            // =========================================================
             
             withAnimation {
                 self.discoveredWords = filteredWords
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
             }
             
+            self.analysisStage = "단어 \(filteredWords.count)개 발견 ✅" // 🌟 완료 상태
             self.isAnalyzing = false
-            return finalProcessedImage // 🌟 완성된 흑백 사진을 뷰로 반환!
+            return finalProcessedImage
             
         } catch {
             print("❌ AR 분석 에러: \(error.localizedDescription)")
@@ -153,6 +158,7 @@ class ARViewModel: ObservableObject {
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
         
+        self.analysisStage = ""
         self.isAnalyzing = false
         return nil
     }
@@ -167,7 +173,8 @@ class ARViewModel: ObservableObject {
         let newImage = UIGraphicsGetImageFromCurrentImageContext()
         UIGraphicsEndImageContext()
         
-        guard let compressedData = newImage?.jpegData(compressionQuality: 0.7) else { return nil }
+        // 🌟 [조원 아이디어 2] 압축률을 0.7에서 0.5로 낮춰서 업로드 속도 최적화
+        guard let compressedData = newImage?.jpegData(compressionQuality: 0.5) else { return nil }
         return UIImage(data: compressedData)
     }
 }

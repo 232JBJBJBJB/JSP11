@@ -217,9 +217,11 @@ struct MainCameraView: View {
                         if frozenImage == nil || arViewModel.isAnalyzing {
                             Button(action: startAnalysis) {
                                 HStack {
+                                    // 🌟 [조원 아이디어 통합] 실시간 로딩 문구 애니메이션
                                     if arViewModel.isAnalyzing {
                                         ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        Text(" 제미나이 분석 중...")
+                                        Text(" \(arViewModel.analysisStage.isEmpty ? "분석 중..." : arViewModel.analysisStage)")
+                                            .animation(.easeInOut, value: arViewModel.analysisStage)
                                     } else {
                                         Image(systemName: "wand.and.stars")
                                         Text("이 공간 캡처 및 분석하기")

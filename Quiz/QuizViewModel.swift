@@ -14,14 +14,14 @@ enum QuizState {
 
 // ==========================================
 // MARK: - QuizViewModel
-// AIManager 연동 + 출현 빈도수 기반 단어 추출
+// AIManager 연동 + 프리로드 + 빈도수 기반 추출
 // ==========================================
 @MainActor
 class QuizViewModel: ObservableObject {
     @Published var state: QuizState = .idle
     @Published var targetLanguage: String = "중국어"
 
-    // 사전 로딩된 퀴즈 창고
+    // 🌟 사전 로딩된 퀴즈 창고 (0초 로딩의 비결!)
     private var preloadedQuiz: GeneratedQuiz? = nil
     private var isPreloading: Bool = false
 
@@ -34,16 +34,24 @@ class QuizViewModel: ObservableObject {
 
     // MARK: - Public: 퀴즈 요청 (버튼 클릭 시)
     func makeQuiz(from savedWords: [Word]) async {
-        // 창고에 미리 만들어둔 퀴즈가 있다면 즉시 반환
+        // 🌟 창고에 미리 만들어둔 퀴즈가 있다면 대기 시간 없이 즉시 반환!
         if let readyQuiz = preloadedQuiz {
             self.state = .success(readyQuiz)
             self.preloadedQuiz = nil
+            // 퀴즈를 하나 꺼냈으니, 다음 퀴즈를 몰래 다시 만들어둠
             Task { await preloadNextQuiz(from: savedWords) }
             return
         }
 
+        // 창고가 비어있다면 로딩 화면을 띄우고 실시간 생성
         self.state = .loading
         await fetchQuizFromAI(from: savedWords, isPreload: false)
+    }
+
+    // MARK: - Public: QuizView 진입 시 미리 로드 (뷰에서 onAppear로 호출)
+    func preloadIfNeeded(from savedWords: [Word]) async {
+        guard preloadedQuiz == nil, !isPreloading else { return }
+        await preloadNextQuiz(from: savedWords)
     }
 
     // MARK: - Private: 백그라운드 사전 퀴즈 생성
@@ -54,71 +62,75 @@ class QuizViewModel: ObservableObject {
         isPreloading = false
     }
 
-    // MARK: - Private: AI 통신 및 로직 처리
-        private func fetchQuizFromAI(from savedWords: [Word], isPreload: Bool) async {
-            // 🌟 [에러 1 해결] 정렬 로직을 컴파일러가 헷갈리지 않게 명확하게 풀어서 작성!
-            let sortedWords = savedWords.sorted { word1, word2 in
-                let count1 = word1.quizAppearCount ?? 0
-                let count2 = word2.quizAppearCount ?? 0
-                return count1 < count2
-            }
-
-            guard let targetWord = sortedWords.first else {
-                guard !isPreload else { return }
-                self.state = .failure("저장된 단어가 없습니다. 단어를 먼저 추가해 주세요.")
-                return
-            }
-
-            let prompt = buildPrompt(for: targetWord)
-
-            do {
-                let rawText = try await AIManager.shared.generateText(prompt: prompt)
-                
-                let provider = AIManager.shared.lastUsedProvider == .gemini ? "Gemini" : "GPT-4o-mini (폴백)"
-                print("🎯 [\(provider)] 퀴즈 생성 완료 (선정된 단어: \(targetWord.term))")
-
-                let quiz = try await Task.detached(priority: .userInitiated) {
-                    // 🌟 [에러 2 해결] CharacterSet 풀네임을 적어줘서 소속을 확실히 밝힘!
-                    var cleaned = rawText.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
-                    
-                    if cleaned.hasPrefix("```json") { cleaned.removeFirst(7) }
-                    else if cleaned.hasPrefix("```") { cleaned.removeFirst(3) }
-                    if cleaned.hasSuffix("```") { cleaned.removeLast(3) }
-                    
-                    // 여기도 CharacterSet 풀네임 적용
-                    cleaned = cleaned.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
-
-                    guard let data = cleaned.data(using: .utf8) else {
-                        throw DecodingError.dataCorrupted(
-                            .init(codingPath: [], debugDescription: "UTF-8 변환 실패")
-                        )
-                    }
-                    return try JSONDecoder().decode(GeneratedQuiz.self, from: data)
-                }.value
-
-                if let wordId = targetWord.id {
-                    Task {
-                        await APIManager.shared.increaseQuizAppearCount(wordId: Int(wordId))
-                    }
-                }
-
-                if isPreload {
-                    self.preloadedQuiz = quiz
-                } else {
-                    self.state = .success(quiz)
-                    Task { await self.preloadNextQuiz(from: savedWords) }
-                }
-
-            } catch let error as URLError where error.code == .timedOut {
-                guard !isPreload else { return }
-                self.state = .failure("요청 시간이 초과되었습니다. 다시 시도해주세요.")
-            } catch {
-                guard !isPreload else { return }
-                self.state = .failure("퀴즈 생성에 실패했습니다: \(error.localizedDescription)")
-            }
+    // MARK: - Private: AI 통신 및 핵심 로직 처리
+    private func fetchQuizFromAI(from savedWords: [Word], isPreload: Bool) async {
+        
+        // 🌟 1. 출현 빈도수 기반 단어 정렬 (안 나온 단어부터 최우선 출제)
+        let sortedWords = savedWords.sorted { word1, word2 in
+            let count1 = word1.quizAppearCount ?? 0
+            let count2 = word2.quizAppearCount ?? 0
+            return count1 < count2
         }
 
-    // MARK: - Private: 프롬프트 빌더 (특정 단어 타겟팅으로 변경)
+        guard let targetWord = sortedWords.first else {
+            guard !isPreload else { return }
+            self.state = .failure("저장된 단어가 없습니다. 단어를 먼저 추가해 주세요.")
+            return
+        }
+
+        let prompt = buildPrompt(for: targetWord)
+
+        do {
+            let rawText = try await AIManager.shared.generateText(prompt: prompt)
+            
+            let provider = AIManager.shared.lastUsedProvider == .gemini ? "Gemini" : "GPT-4o-mini (폴백)"
+            print("🎯 [\(provider)] 퀴즈 생성 완료 (선정된 단어: \(targetWord.term))")
+
+            // 🌟 2. 독립된 스레드에서 무거운 JSON 파싱 처리 (UI 끊김 방지)
+            let quiz = try await Task.detached(priority: .userInitiated) {
+                // CharacterSet 풀네임 명시로 스레드 격리 에러(Compiler Error) 완벽 차단!
+                var cleaned = rawText.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+                
+                if cleaned.hasPrefix("```json") { cleaned.removeFirst(7) }
+                else if cleaned.hasPrefix("```") { cleaned.removeFirst(3) }
+                if cleaned.hasSuffix("```") { cleaned.removeLast(3) }
+                
+                cleaned = cleaned.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+
+                guard let data = cleaned.data(using: .utf8) else {
+                    throw DecodingError.dataCorrupted(
+                        .init(codingPath: [], debugDescription: "UTF-8 변환 실패")
+                    )
+                }
+                return try JSONDecoder().decode(GeneratedQuiz.self, from: data)
+            }.value
+
+            // 🌟 3. 퀴즈에 출제된 단어의 출현 빈도수 1 증가시키기
+            if let wordId = targetWord.id {
+                Task {
+                    await APIManager.shared.increaseQuizAppearCount(wordId: Int(wordId))
+                }
+            }
+
+            // 🌟 4. 요청 목적에 맞게 분기 처리 (창고 저장 vs 즉시 화면 출력)
+            if isPreload {
+                self.preloadedQuiz = quiz
+            } else {
+                self.state = .success(quiz)
+                // 현재 퀴즈를 화면에 뿌린 후, 곧바로 다음 퀴즈를 미리 만들러 감
+                Task { await self.preloadNextQuiz(from: savedWords) }
+            }
+
+        } catch let error as URLError where error.code == .timedOut {
+            guard !isPreload else { return }
+            self.state = .failure("요청 시간이 초과되었습니다. 다시 시도해주세요.")
+        } catch {
+            guard !isPreload else { return }
+            self.state = .failure("퀴즈 생성에 실패했습니다: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - Private: 프롬프트 빌더 (특정 단어 타겟팅)
     private func buildPrompt(for word: Word) -> String {
         let selectedStyle = quizStyles.randomElement() ?? quizStyles[0]
 

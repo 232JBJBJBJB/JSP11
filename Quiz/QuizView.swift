@@ -80,6 +80,14 @@ struct QuizView: View {
                 )
             }
         }
+        // =======================================================
+        // 🌟 [조원 아이디어 통합] 화면 진입 시 사용자 몰래 퀴즈 미리 준비하기!
+        // =======================================================
+        .onAppear {
+            if !wordViewModel.words.isEmpty {
+                Task { await quizViewModel.preloadIfNeeded(from: wordViewModel.words) }
+            }
+        }
         .navigationTitle(quizViewModel.targetLanguage + " 퀴즈") // 다국어 제목 동적 적용
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

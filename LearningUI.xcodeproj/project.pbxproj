@@ -12,7 +12,7 @@
 		4746E0C32F876A7100F20F89 /* opencv2.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4746E0C22F876A7100F20F89 /* opencv2.framework */; };
 		4750FBF62FA1A07A004AE1AE /* WordComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4750FBF52FA1A07A004AE1AE /* WordComponents.swift */; };
 		4750FBF82FA1A08E004AE1AE /* WordDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4750FBF72FA1A08E004AE1AE /* WordDetailView.swift */; };
-		4754F6A22F875B4A00A9E26E /* ARBubbleRenderer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4754F6A02F875B4A00A9E26E /* ARBubbleRenderer.cpp */; };
+		475307942FB58E4E008D6FEC /* ARBubbleRenderer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 476501942FB58DA000A6BE6E /* ARBubbleRenderer.cpp */; };
 		4754F6A32F875B4A00A9E26E /* ARBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4754F69E2F875B4A00A9E26E /* ARBridge.mm */; };
 		4764D6882F461B060046B5A5 /* QuizView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4764D66C2F3DC4050046B5A5 /* QuizView.swift */; };
 		4764D6892F461B060046B5A5 /* QuizViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4764D6592F3DBE520046B5A5 /* QuizViewModel.swift */; };
@@ -65,11 +65,11 @@
 		4754F69D2F875B4A00A9E26E /* ARBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARBridge.h; sourceTree = "<group>"; };
 		4754F69E2F875B4A00A9E26E /* ARBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ARBridge.mm; sourceTree = "<group>"; };
 		4754F69F2F875B4A00A9E26E /* ARBubbleRenderer.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ARBubbleRenderer.hpp; sourceTree = "<group>"; };
-		4754F6A02F875B4A00A9E26E /* ARBubbleRenderer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ARBubbleRenderer.cpp; sourceTree = "<group>"; };
 		4764D6502F3AFBCE0046B5A5 /* WordViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WordViewModel.swift; sourceTree = "<group>"; };
 		4764D6522F3AFBF90046B5A5 /* Word.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Word.swift; sourceTree = "<group>"; };
 		4764D6592F3DBE520046B5A5 /* QuizViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizViewModel.swift; sourceTree = "<group>"; };
 		4764D66C2F3DC4050046B5A5 /* QuizView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizView.swift; sourceTree = "<group>"; };
+		476501942FB58DA000A6BE6E /* ARBubbleRenderer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ARBubbleRenderer.cpp; sourceTree = "<group>"; };
 		4778A4B22F62A4F70097CCB1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		4778A4B32F62A4F70097CCB1 /* Bundle+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Bundle+Extension.swift"; sourceTree = "<group>"; };
 		4778A4B42F62A4F70097CCB1 /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
@@ -161,10 +161,10 @@
 		4754F6A12F875B4A00A9E26E /* ARBubbleRender */ = {
 			isa = PBXGroup;
 			children = (
+				476501942FB58DA000A6BE6E /* ARBubbleRenderer.cpp */,
 				4754F69D2F875B4A00A9E26E /* ARBridge.h */,
 				4754F69E2F875B4A00A9E26E /* ARBridge.mm */,
 				4754F69F2F875B4A00A9E26E /* ARBubbleRenderer.hpp */,
-				4754F6A02F875B4A00A9E26E /* ARBubbleRenderer.cpp */,
 			);
 			path = ARBubbleRender;
 			sourceTree = "<group>";
@@ -361,11 +361,11 @@
 				4764D6892F461B060046B5A5 /* QuizViewModel.swift in Sources */,
 				4750FBF62FA1A07A004AE1AE /* WordComponents.swift in Sources */,
 				4764D68A2F461B060046B5A5 /* Word.swift in Sources */,
+				475307942FB58E4E008D6FEC /* ARBubbleRenderer.cpp in Sources */,
 				4764D68B2F461B060046B5A5 /* WordViewModel.swift in Sources */,
 				4778A4BB2F62A4F70097CCB1 /* Bundle+Extension.swift in Sources */,
 				4778A4EB2F68E1D60097CCB1 /* ARViewModel.swift in Sources */,
 				47C3C1E92F74010C00503C09 /* ARNetworkManager.swift in Sources */,
-				4754F6A22F875B4A00A9E26E /* ARBubbleRenderer.cpp in Sources */,
 				4754F6A32F875B4A00A9E26E /* ARBridge.mm in Sources */,
 				4750FBF82FA1A08E004AE1AE /* WordDetailView.swift in Sources */,
 				4778A4BC2F62A4F70097CCB1 /* Constants.swift in Sources */,

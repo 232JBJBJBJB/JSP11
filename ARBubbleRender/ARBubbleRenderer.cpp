@@ -131,27 +131,30 @@ void ARBubbleRenderer::RenderEnhanced(cv::Mat& frame, bool applyBlur, float upsc
         cv::Mat mask = cv::Mat::zeros(frame.size(), CV_8UC1);
 
         for (const ARWordData& wordData : currentWords) {
-            float boxX = wordData.xmin * screenWidth;
-            float boxY = wordData.ymin * screenHeight;
+            float centerX = ((wordData.xmin + wordData.xmax) / 2.0f) * screenWidth;
+            float centerY = ((wordData.ymin + wordData.ymax) / 2.0f) * screenHeight;
+
+            cv::Point center(
+                static_cast<int>(centerX),
+                static_cast<int>(centerY)
+            );
+
+            // 가로 세로 길이 계산 (원의 크기인 반지름을 정하기 위해 필요)
             float boxW = (wordData.xmax - wordData.xmin) * screenWidth;
             float boxH = (wordData.ymax - wordData.ymin) * screenHeight;
 
-            cv::Point center(
-                static_cast<int>(boxX + (boxW / 2.0f)),
-                static_cast<int>(boxY + (boxH / 2.0f))
-            );
-
-            // 원의 반지름: 물체 너비와 높이 중 큰 값의 절반 (약간 타이트하게 0.85 곱함)
+            // 크기는 물체의 가로/세로 중 큰 값의 절반을 반지름으로 설정 (약간 타이트하게 0.85배)
             int radius = static_cast<int>(std::max(boxW, boxH) / 2.0f * 0.85f);
 
             if (radius > 0) {
-                // 중앙을 기준으로 원형 마스크 그리기
+                // 구출해낸 정확한 중간 좌표(center)를 기준으로 원 그리기
                 cv::circle(mask, center, radius, cv::Scalar(255), cv::FILLED);
             }
         }
 
-        cv::GaussianBlur(mask, mask, cv::Size(31, 31), 0);
+        cv::GaussianBlur(mask, mask, cv::Size(91, 91), 0);
 
+        // 부드러운 원형 마스크를 이용해 흑백 배경 위에 원본 컬러 사물 합성
         frame.copyTo(grayBackground, mask);
         frame = grayBackground;
     }

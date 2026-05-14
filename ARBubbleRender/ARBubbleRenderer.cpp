@@ -63,7 +63,6 @@ int ARBubbleRenderer::CalculateTextWidth(const std::string& text, double fontSca
     return textSize.width;
 }
 
-// 성능 개선: ROI(관심 영역)를 활용하여 투명 말풍선 렌더링 부하 대폭 감소
 void ARBubbleRenderer::DrawTransparentRoundedRect(cv::Mat& frame, cv::Rect rect, cv::Scalar color, int cornerRadius, double alpha) {
     // 화면 범위를 벗어나지 않도록 안전 영역(ROI) 계산
     cv::Rect safeRect = rect & cv::Rect(0, 0, frame.cols, frame.rows);
@@ -94,10 +93,13 @@ void ARBubbleRenderer::DrawTextLabel(cv::Mat& frame, const std::string& text, cv
     cv::putText(frame, text, position, cv::FONT_HERSHEY_SIMPLEX, fontScale, color, 1, cv::LINE_AA);
 }
 
+void ARBubbleRenderer::UpdateWords(const std::vector<ARWordData>& words) {
+    currentWords = words;
+}
+
 void ARBubbleRenderer::RenderEnhanced(cv::Mat& frame, bool applyBlur, float upscaleFactor) {
     if (frame.empty()) return;
 
-    // 1. 해상도 업스케일링
     if (upscaleFactor > 1.0f) {
         cv::resize(frame, frame, cv::Size(), upscaleFactor, upscaleFactor, cv::INTER_CUBIC);
     }
@@ -105,81 +107,52 @@ void ARBubbleRenderer::RenderEnhanced(cv::Mat& frame, bool applyBlur, float upsc
     int screenWidth = frame.cols;
     int screenHeight = frame.rows;
 
-   // 2. 초고속 흑백 포커싱 필터 적용 (블러 제거로 연산량 최소화)
-    if (applyBlur && !currentWords.empty()) { // (변수명 applyBlur는 밖에서 통제하므로 그대로 둡니다)
+    if (applyBlur && !currentWords.empty()) {
         cv::Mat grayBackground;
 
+        // 아이폰(4채널 RGBA)과 VS(3채널 BGR) 완벽 대응
         if (frame.channels() == 4) {
-            // iOS 카메라 환경 (RGBA)
             cv::cvtColor(frame, grayBackground, cv::COLOR_RGBA2GRAY);
             cv::cvtColor(grayBackground, grayBackground, cv::COLOR_GRAY2RGBA);
         }
         else {
-            // Visual Studio 테스트 환경 (BGR)
             cv::cvtColor(frame, grayBackground, cv::COLOR_BGR2GRAY);
             cv::cvtColor(grayBackground, grayBackground, cv::COLOR_GRAY2BGR);
         }
 
+        // 아이폰용 흑백 밝기 보정
+        cv::Scalar brightnessOffset = (frame.channels() == 4) ? cv::Scalar(40, 40, 40, 0) : cv::Scalar(40, 40, 40);
+        cv::add(grayBackground, brightnessOffset, grayBackground);
+
+        // 흑백 불투명도 70% 적용
+        double bwAlpha = 0.7;
+        cv::addWeighted(grayBackground, bwAlpha, frame, 1.0 - bwAlpha, 0.0, grayBackground);
+
         cv::Mat mask = cv::Mat::zeros(frame.size(), CV_8UC1);
 
         for (const ARWordData& wordData : currentWords) {
-            cv::Rect objectRect(
-                wordData.xmin * screenWidth,
-                wordData.ymin * screenHeight,
-                (wordData.xmax - wordData.xmin) * screenWidth,
-                (wordData.ymax - wordData.ymin) * screenHeight
+            float boxX = wordData.xmin * screenWidth;
+            float boxY = wordData.ymin * screenHeight;
+            float boxW = (wordData.xmax - wordData.xmin) * screenWidth;
+            float boxH = (wordData.ymax - wordData.ymin) * screenHeight;
+
+            cv::Point center(
+                static_cast<int>(boxX + (boxW / 2.0f)),
+                static_cast<int>(boxY + (boxH / 2.0f))
             );
-            cv::rectangle(mask, objectRect, cv::Scalar(255), cv::FILLED);
+
+            // 원의 반지름: 물체 너비와 높이 중 큰 값의 절반 (약간 타이트하게 0.85 곱함)
+            int radius = static_cast<int>(std::max(boxW, boxH) / 2.0f * 0.85f);
+
+            if (radius > 0) {
+                // 중앙을 기준으로 원형 마스크 그리기
+                cv::circle(mask, center, radius, cv::Scalar(255), cv::FILLED);
+            }
         }
 
-        // 2. 무거운 블러 합성 대신, 흑백 배경 위에 원본 컬러 사물만 바로 덮어쓰기
+        cv::GaussianBlur(mask, mask, cv::Size(31, 31), 0);
+
         frame.copyTo(grayBackground, mask);
         frame = grayBackground;
-    }
-
-    // 3. 기존 말풍선 렌더링
-    for (const ARWordData& wordData : currentWords) {
-        float absoluteX = wordData.relativeX * screenWidth;
-        float absoluteY = wordData.relativeY * screenHeight;
-
-        int fontFace = cv::FONT_HERSHEY_SIMPLEX;
-        double wordFontScale = 0.7;
-        double subFontScale = 0.5;
-        int thickness = 1;
-
-        int wordWidth = CalculateTextWidth(wordData.word, wordFontScale, thickness);
-        int pronWidth = CalculateTextWidth(wordData.pronunciation, subFontScale, thickness);
-        int meaningWidth = CalculateTextWidth(wordData.meaning, subFontScale, thickness);
-
-        int maxTextWidth = std::max({ wordWidth, pronWidth, meaningWidth });
-
-        int paddingX = 20;
-        int paddingY = 15;
-        int lineSpacing = 10;
-        int baseTextHeight = 15;
-
-        int bubbleWidth = maxTextWidth + (paddingX * 2);
-        int bubbleHeight = (baseTextHeight * 3) + (lineSpacing * 2) + (paddingY * 2);
-
-        int startX = absoluteX - (bubbleWidth / 2);
-        int startY = absoluteY - bubbleHeight - 30;
-
-        startX = std::max(0, std::min(startX, screenWidth - bubbleWidth));
-        startY = std::max(0, std::min(startY, screenHeight - bubbleHeight));
-
-        cv::Rect bubbleRect(startX, startY, bubbleWidth, bubbleHeight);
-        DrawTransparentRoundedRect(frame, bubbleRect, cv::Scalar(0, 0, 0), 15, 0.6);
-
-        cv::Scalar textColor(255, 255, 255);
-        int textX = startX + paddingX;
-        int currentY = startY + paddingY + baseTextHeight;
-
-        DrawTextLabel(frame, wordData.word, cv::Point(textX, currentY), wordFontScale, textColor);
-        currentY += baseTextHeight + lineSpacing;
-
-        DrawTextLabel(frame, wordData.pronunciation, cv::Point(textX, currentY), subFontScale, textColor);
-        currentY += baseTextHeight + lineSpacing;
-
-        DrawTextLabel(frame, wordData.meaning, cv::Point(textX, currentY), subFontScale, textColor);
     }
 }

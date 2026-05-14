@@ -17,7 +17,6 @@ struct Constants {
         static let newWordHeader = "새로운 단어 발견! 💡"
         static let emptyTitle = "오늘의 AI 독해 퀴즈"
         static let emptyDesc = "저장된 단어를 기반으로\n새로운 이야기를 만들어 드려요."
-        // [추가된 라벨들]
         static let editWord = "단어 수정"
         static let pronunciation = "발음"
         static let example = "예문"
@@ -45,8 +44,6 @@ struct Constants {
         static let gear = "gearshape.fill"
         static let trash = "trash"
         static let gameController = "gamecontroller.fill"
-        
-        // [추가된 아이콘들]
         static let star = "star"
         static let starFill = "star.fill"
         static let speaker = "speaker.wave.2.fill"
@@ -54,7 +51,7 @@ struct Constants {
         static let book = "book.pages.fill"
         static let plusApp = "plus.app.fill"
         static let xmark = "xmark.circle.fill"
-        static let camera = "camera.viewfinder" // 카메라 화면으로 가는 버튼용
+        static let camera = "camera.viewfinder"
         static let cameraSlash = "camera.slash"
     }
     
@@ -74,14 +71,14 @@ struct Constants {
         static let secretsFile = "Secrets"
         static let plistExtension = "plist"
         static let apiKeyName = "GEMINI_API_KEY"
-        static let modelName = "gemini-2.5-flash"
+        // 텍스트 전용(퀴즈): 빠른 모델, 이미지 분석: 고품질 모델
+        static let textModelName = "gemini-2.0-flash"
+        static let imageModelName = "gemini-2.5-flash"
     }
         
-        // 💥 5. 치명적 에러 (앱이 죽어야 하는 상황, 새로 추가)
     struct FatalErrors {
         static let noSecretsFile = "🚨 Secrets.plist 파일을 찾을 수 없습니다."
         static let unreadableSecrets = "🚨 Secrets.plist를 읽을 수 없습니다."
         static let noApiKey = "🚨 Secrets.plist에 'GEMINI_API_KEY'가 없습니다."
     }
-
 }

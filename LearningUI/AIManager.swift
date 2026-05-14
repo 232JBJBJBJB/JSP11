@@ -25,7 +25,7 @@ enum AIProvider {
     case gemini, gpt
 }
 
-// MARK: - AIManager (핵심: Gemini 먼저, 실패 시에만 GPT)
+// MARK: - AIManager (핵심: 투트랙 Gemini 먼저, 실패 시에만 GPT 폴백)
 @MainActor
 class AIManager {
     static let shared = AIManager()
@@ -33,15 +33,27 @@ class AIManager {
     // 마지막으로 성공한 프로바이더 (로그용)
     private(set) var lastUsedProvider: AIProvider = .gemini
     
-    private let geminiModel: GenerativeModel
+    // 🌟 [조원 아이디어 통합] 용도별로 모델(뇌)을 두 개로 분리!
+    // 1. 텍스트 전용 (퀴즈/온보딩): 빠른 모델, thinking 없음
+    private let geminiTextModel: GenerativeModel
+    // 2. 이미지 분석 (AR): 고품질 모델, thinking 제한
+    private let geminiVisionModel: GenerativeModel
+    
     private let gptEndpoint = URL(string: "https://api.openai.com/v1/chat/completions")!
     
     // 폴백 판단 기준 HTTP 상태 코드
     private let fallbackStatusCodes: Set<Int> = [429, 500, 502, 503, 504]
     
     private init() {
-        self.geminiModel = GenerativeModel(
-            name: Constants.Config.modelName, // "gemini-2.5-flash"
+        // 🌟 퀴즈용: 가볍고 빠른 텍스트 전용 모델 세팅
+        self.geminiTextModel = GenerativeModel(
+            name: Constants.Config.textModelName, // 예: "gemini-2.0-flash"
+            apiKey: Bundle.main.geminiApiKey
+        )
+        
+        
+        self.geminiVisionModel = GenerativeModel(
+            name: Constants.Config.imageModelName, // 예: "gemini-2.5-flash"
             apiKey: Bundle.main.geminiApiKey
         )
     }
@@ -50,14 +62,14 @@ class AIManager {
     // 📝 텍스트 전용 요청 (QuizViewModel, OnboardingView용)
     // ==========================================
     func generateText(prompt: String) async throws -> String {
-        // 1차: Gemini 시도
+        // 1차: Gemini (빠른 텍스트 모델) 시도
         do {
             let result = try await callGeminiText(prompt: prompt)
             lastUsedProvider = .gemini
-            print("✅ [Gemini] 텍스트 생성 성공")
+            print("✅ [Gemini Text] 텍스트 생성 성공")
             return result
         } catch {
-            print("⚠️ [Gemini] 실패 → GPT 폴백 시도. 원인: \(error.localizedDescription)")
+            print("⚠️ [Gemini Text] 실패 → GPT 폴백 시도. 원인: \(error.localizedDescription)")
         }
         
         // 2차: GPT 폴백 (Gemini가 실패할 때만!)
@@ -76,14 +88,14 @@ class AIManager {
     // 🖼️ 이미지 포함 요청 (ARViewModel용)
     // ==========================================
     func generateTextFromImage(prompt: String, image: UIImage) async throws -> String {
-        // 1차: Gemini 시도 (이미지 분석은 Gemini가 훨씬 저렴!)
+        // 1차: Gemini (생각하는 비전 모델) 시도
         do {
             let result = try await callGeminiImage(prompt: prompt, image: image)
             lastUsedProvider = .gemini
-            print("✅ [Gemini] 이미지 분석 성공")
+            print("✅ [Gemini Vision] 이미지 분석 성공")
             return result
         } catch {
-            print("⚠️ [Gemini] 이미지 분석 실패 → GPT-4o 폴백 시도. 원인: \(error.localizedDescription)")
+            print("⚠️ [Gemini Vision] 이미지 분석 실패 → GPT-4o 폴백 시도. 원인: \(error.localizedDescription)")
         }
         
         // 2차: GPT-4o 폴백 (Gemini 실패 시에만, 비용 주의!)
@@ -99,13 +111,13 @@ class AIManager {
     }
     
     // ==========================================
-    // MARK: - Private: Gemini 호출
+    // MARK: - Private: Gemini 호출 (투트랙 분리)
     // ==========================================
     private func callGeminiText(prompt: String) async throws -> String {
-        // 30초 타임아웃 적용
         return try await withThrowingTaskGroup(of: String.self) { group in
             group.addTask {
-                let response = try await self.geminiModel.generateContent(prompt)
+                // 🌟 빠른 텍스트 전용 모델 사용!
+                let response = try await self.geminiTextModel.generateContent(prompt)
                 guard let text = response.text, !text.isEmpty else {
                     throw AIError.emptyResponse
                 }
@@ -124,7 +136,8 @@ class AIManager {
     private func callGeminiImage(prompt: String, image: UIImage) async throws -> String {
         return try await withThrowingTaskGroup(of: String.self) { group in
             group.addTask {
-                let response = try await self.geminiModel.generateContent(prompt, image)
+                // 🌟 추론(Thinking) 능력이 켜진 비전 전용 모델 사용!
+                let response = try await self.geminiVisionModel.generateContent(prompt, image)
                 guard let text = response.text, !text.isEmpty else {
                     throw AIError.emptyResponse
                 }
@@ -247,7 +260,7 @@ class AIManager {
 extension Bundle {
     var openAIApiKey: String {
         guard let filePath = Bundle.main.path(forResource: Constants.Config.secretsFile,
-                                               ofType: Constants.Config.plistExtension) else {
+                                              ofType: Constants.Config.plistExtension) else {
             fatalError("🚨 Secrets.plist 파일을 찾을 수 없습니다.")
         }
         guard let plist = NSDictionary(contentsOfFile: filePath) else {
